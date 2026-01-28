@@ -93,6 +93,8 @@ function extractToolContent(tool) {
         className: tool.className,
         expositionId: expositionId,
         weaveId: weaveId,
+        url: window.location.href,
+        timestamp: new Date().toISOString(),
         content: ''
     };
     
@@ -128,6 +130,71 @@ function extractToolContent(tool) {
     return toolData;
 }
 
+// Function to store tools in browser storage by exposition and weave
+async function storeToolsInMemory(tools) {
+    const bodyElement = document.body;
+    const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
+    const weaveId = bodyElement.dataset.weave || extractFromUrl('weave') || 'unknown';
+    
+    console.log(`Storing ${tools.length} tools for exposition ${expositionId}, weave ${weaveId}`);
+    
+    // Get existing stored tools for this exposition
+    const storageKey = `rc_exposition_${expositionId}`;
+    const result = await browser.storage.local.get(storageKey);
+    let expositionData = result[storageKey] || {
+        expositionId: expositionId,
+        weaves: {},
+        lastUpdated: new Date().toISOString()
+    };
+    
+    // Prepare tools data for current weave
+    const weaveTools = [];
+    tools.forEach(tool => {
+        const toolData = extractToolContent(tool);
+        weaveTools.push(toolData);
+    });
+    
+    // Store tools organized by weave
+    expositionData.weaves[weaveId] = {
+        weaveId: weaveId,
+        url: window.location.href,
+        tools: weaveTools,
+        lastVisited: new Date().toISOString(),
+        pageTitle: document.title
+    };
+    
+    expositionData.lastUpdated = new Date().toISOString();
+    
+    // Save back to storage
+    await browser.storage.local.set({ [storageKey]: expositionData });
+    console.log(`Stored exposition data:`, expositionData);
+    
+    // Update button text to show total count across all weaves
+    updateSaveButtonCount(expositionData);
+}
+
+// Function to update save button with total tool count
+function updateSaveButtonCount(expositionData) {
+    const saveButton = document.getElementById('rc-save-tools-btn');
+    if (!saveButton) return;
+    
+    let totalTools = 0;
+    let weaveCount = 0;
+    
+    Object.values(expositionData.weaves).forEach(weave => {
+        totalTools += weave.tools.length;
+        weaveCount++;
+    });
+    
+    const buttonText = saveButton.querySelector('span') || saveButton;
+    buttonText.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 16 16" style="margin-right: 6px;">
+            <path fill="currentColor" d="M13 0H3a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V3a3 3 0 0 0-3-3zM8 1.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zM11 14.5H5a.5.5 0 0 1 0-1h6a.5.5 0 0 1 0 1z"/>
+        </svg>
+        Save ${totalTools} Tools (${weaveCount} weaves)
+    `;
+}
+
 // Function to create save button
 function createSaveButton() {
     // Remove existing button if present
@@ -140,60 +207,82 @@ function createSaveButton() {
     saveButton.id = 'rc-save-tools-btn';
     saveButton.className = 'rc-save-button';
     saveButton.innerHTML = `
-        <svg width="16" height="16" viewBox="0 0 16 16" style="margin-right: 6px;">
-            <path fill="currentColor" d="M13 0H3a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V3a3 3 0 0 0-3-3zM8 1.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zM11 14.5H5a.5.5 0 0 1 0-1h6a.5.5 0 0 1 0 1z"/>
-        </svg>
-        Save Tools as JSON
+        <span>
+            <svg width="16" height="16" viewBox="0 0 16 16" style="margin-right: 6px;">
+                <path fill="currentColor" d="M13 0H3a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V3a3 3 0 0 0-3-3zM8 1.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zM11 14.5H5a.5.5 0 0 1 0-1h6a.5.5 0 0 1 0 1z"/>
+            </svg>
+            Save Tools as JSON
+        </span>
     `;
     
     saveButton.addEventListener('click', () => {
-        saveToolsAsJSON();
+        saveAllToolsAsJSON();
     });
     
     document.body.appendChild(saveButton);
 }
 
-// Function to save tools as JSON
-function saveToolsAsJSON() {
-    const tools = document.querySelectorAll('[data-rc-tool-enhanced="true"]');
-    
-    // Extract exposition and weave IDs
+// Function to save all tools from all visited weaves as JSON
+async function saveAllToolsAsJSON() {
     const bodyElement = document.body;
     const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
-    const weaveId = bodyElement.dataset.weave || extractFromUrl('weave') || 'unknown';
     
-    const toolsData = {
-        page: {
-            url: window.location.href,
-            title: document.title,
-            timestamp: new Date().toISOString(),
-            expositionId: expositionId,
-            weaveId: weaveId
+    // Get stored tools for this exposition
+    const storageKey = `rc_exposition_${expositionId}`;
+    const result = await browser.storage.local.get(storageKey);
+    const expositionData = result[storageKey];
+    
+    if (!expositionData || !expositionData.weaves || Object.keys(expositionData.weaves).length === 0) {
+        showNotification('No tools found to save');
+        return;
+    }
+    
+    // Create comprehensive JSON structure
+    const exportData = {
+        exposition: {
+            id: expositionId,
+            exportTimestamp: new Date().toISOString(),
+            totalWeaves: Object.keys(expositionData.weaves).length,
+            totalTools: Object.values(expositionData.weaves).reduce((sum, weave) => sum + weave.tools.length, 0)
         },
-        tools: []
+        weaves: {}
     };
     
-    tools.forEach((tool, index) => {
-        const toolData = extractToolContent(tool);
-        toolsData.tools.push(toolData);
+    // Organize tools by weave
+    Object.entries(expositionData.weaves).forEach(([weaveId, weaveData]) => {
+        exportData.weaves[weaveId] = {
+            weaveId: weaveId,
+            url: weaveData.url,
+            pageTitle: weaveData.pageTitle,
+            lastVisited: weaveData.lastVisited,
+            toolCount: weaveData.tools.length,
+            tools: weaveData.tools
+        };
     });
     
     // Create downloadable JSON file
-    const jsonString = JSON.stringify(toolsData, null, 2);
+    const jsonString = JSON.stringify(exportData, null, 2);
     const blob = new Blob([jsonString], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     
     // Create download link
     const link = document.createElement('a');
     link.href = url;
-    link.download = `rc-tools-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
+    link.download = `rc-exposition-${expositionId}-tools-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
     
     // Show confirmation
-    showNotification(`Saved ${toolsData.tools.length} tools to JSON file`);
+    const weaveCount = Object.keys(expositionData.weaves).length;
+    const toolCount = Object.values(expositionData.weaves).reduce((sum, weave) => sum + weave.tools.length, 0);
+    showNotification(`Saved ${toolCount} tools from ${weaveCount} weaves`);
+}
+
+// Function to save tools as JSON (legacy - keeping for backwards compatibility)
+function saveToolsAsJSON() {
+    saveAllToolsAsJSON();
 }
 
 // Function to show notification
@@ -294,6 +383,11 @@ function enhanceTools() {
     
     console.log(`RC Tool Commenter: Found ${tools.length} tools to enhance`);
     
+    // Store found tools in memory for cross-weave collection
+    if (tools.length > 0) {
+        storeToolsInMemory(tools);
+    }
+    
     tools.forEach((tool, index) => {
         // Mark as enhanced to avoid duplicate processing
         tool.setAttribute('data-rc-tool-enhanced', 'true');
@@ -338,16 +432,6 @@ function enhanceTools() {
             
             console.log(`RC Tool Commenter: Clicked on tool "${toolName}"`);
             showToolName(toolName, x, y);
-            
-            // Store tool interaction for future comment feature
-            browser.storage.local.set({
-                [`tool_${Date.now()}`]: {
-                    toolName: toolName,
-                    url: window.location.href,
-                    timestamp: new Date().toISOString(),
-                    element: tool.tagName + (tool.className ? '.' + tool.className.replace(/\s+/g, '.') : '')
-                }
-            });
         });
         
         // Add hover effect
@@ -370,7 +454,7 @@ function enhanceTools() {
 }
 
 // Function to initialize the extension
-function initializeExtension() {
+async function initializeExtension() {
     if (!isExpositionPage()) {
         console.log('RC Tool Commenter: Not on a Research Catalogue exposition page');
         return;
@@ -385,8 +469,19 @@ function initializeExtension() {
         console.log(`Tool ${i+1}:`, tool.className, 'Data-tool:', tool.dataset.tool, tool);
     });
     
+    // Load existing data to update button count
+    const bodyElement = document.body;
+    const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
+    const storageKey = `rc_exposition_${expositionId}`;
+    const result = await browser.storage.local.get(storageKey);
+    
     // Initial enhancement
     enhanceTools();
+    
+    // Update button with existing counts if available
+    if (result[storageKey]) {
+        updateSaveButtonCount(result[storageKey]);
+    }
     
     // Watch for dynamically added content
     const observer = new MutationObserver((mutations) => {
