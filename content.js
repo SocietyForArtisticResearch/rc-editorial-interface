@@ -12,6 +12,20 @@ function isExpositionPage() {
 
 // Function to identify tool elements in the exposition
 function identifyTools() {
+    // Skip if we're in text-only view
+    if (isTextOnlyView) {
+        console.log('RC Tool Commenter: Skipping tool identification - in text-only view');
+        return [];
+    }
+    
+    // Prevent excessive calls (throttle to once per 100ms)
+    const now = Date.now();
+    if (now - lastToolIdentification < 100) {
+        console.log('RC Tool Commenter: Throttling tool identification');
+        return [];
+    }
+    lastToolIdentification = now;
+    
     // Research Catalogue uses specific tool classes based on the HTML structure
     // Tools are elements with class starting with 'tool-' and have data-tool attribute
     const toolSelectors = [
@@ -66,6 +80,47 @@ function identifyTools() {
         createSaveButton();
     }
     
+    return tools;
+}
+
+// Function to get all text tools regardless of enhancement state (for text-only view)
+function getAllTextTools() {
+    const toolSelectors = [
+        '.tool-text',
+        '.tool-simpletext'
+    ];
+    
+    let tools = [];
+    
+    console.log('RC Tool Commenter: Getting all text tools for text-only view...');
+    
+    toolSelectors.forEach(selector => {
+        const elements = document.querySelectorAll(selector);
+        console.log(`Found ${elements.length} elements with selector "${selector}"`);
+        
+        elements.forEach(element => {
+            // Include all tools, even if enhanced, but exclude tool-content divs
+            if (!element.classList.contains('tool-content') && !tools.includes(element)) {
+                console.log(`Adding tool for text-only view:`, element, `Class: ${element.className}, Data-tool: ${element.dataset.tool}`);
+                tools.push(element);
+            } else {
+                console.log(`Skipping tool-content or duplicate:`, element);
+            }
+        });
+    });
+    
+    // Also look for any div with class starting with 'tool-' that has data-tool attribute
+    const genericTools = document.querySelectorAll('div.tool-text[data-tool], div.tool-simpletext[data-tool]');
+    console.log(`Found ${genericTools.length} generic text tool elements`);
+    
+    genericTools.forEach(element => {
+        if (!element.classList.contains('tool-content') && !tools.includes(element)) {
+            console.log(`Adding generic text tool for text-only view:`, element);
+            tools.push(element);
+        }
+    });
+    
+    console.log(`RC Tool Commenter: Total tools for text-only view: ${tools.length}`);
     return tools;
 }
 
@@ -253,6 +308,20 @@ function createSaveButton() {
     `;
     importButton.title = 'Import suggestions from JSON file';
     
+    // Create text-only view toggle button
+    const viewToggleButton = document.createElement('button');
+    viewToggleButton.id = 'rc-view-toggle-btn';
+    viewToggleButton.className = 'rc-view-toggle-button';
+    viewToggleButton.innerHTML = `
+        <span>
+            <svg width="16" height="16" viewBox="0 0 16 16" style="margin-right: 6px;">
+                <path fill="currentColor" d="M1 2.828c.885-.37 2.154-.769 3.388-.893 1.33-.134 2.458.063 3.112.752v9.746c-.935-.53-2.12-.603-3.213-.493-1.18.12-2.37.461-3.287.811V2.828zm7.5-.141c.654-.689 1.782-.886 3.112-.752 1.234.124 2.503.523 3.388.893v9.923c-.918-.35-2.107-.692-3.287-.81-1.094-.111-2.278-.039-3.213.492V2.687zM8 1.783C7.015.936 5.587.81 4.287.94c-1.514.153-3.042.672-3.994 1.105A.5.5 0 0 0 0 2.5v11a.5.5 0 0 0 .707.455c.882-.4 2.303-.881 3.68-1.02 1.409-.142 2.59.087 3.223.877a.5.5 0 0 0 .78 0c.633-.79 1.814-1.019 3.222-.877 1.378.139 2.8.62 3.681 1.02A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.293-.455c-.952-.433-2.48-.952-3.994-1.105C10.413.809 8.985.936 8 1.783z"/>
+            </svg>
+            Text View
+        </span>
+    `;
+    viewToggleButton.title = 'Toggle between normal and text-only view';
+    
     // Create hidden file input for import
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
@@ -263,9 +332,11 @@ function createSaveButton() {
     // Add click handlers
     importButton.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', handleImportFile);
+    viewToggleButton.addEventListener('click', toggleTextOnlyView);
 
     document.body.appendChild(saveButton);
     document.body.appendChild(importButton);
+    document.body.appendChild(viewToggleButton);
     document.body.appendChild(fileInput);
 }
 
@@ -577,12 +648,271 @@ function showImportStatus(message, type = 'info') {
     }, 4000);
 }
 
+// Global variable to track view state
+let isTextOnlyView = false;
+let originalPageContent = null;
+let cachedTools = null;
+let cachedToolsData = null;
+let lastToolIdentification = 0;
+
+// Function to toggle between normal and text-only view
+async function toggleTextOnlyView() {
+    const toggleButton = document.getElementById('rc-view-toggle-btn');
+    
+    console.log('RC Tool Commenter: Toggle clicked, current isTextOnlyView:', isTextOnlyView);
+    
+    if (!isTextOnlyView) {
+        // Store current tools and their data before switching
+        cachedTools = getAllTextTools();
+        cachedToolsData = cachedTools.map(tool => extractToolContent(tool));
+        console.log('Cached tools before switching:', cachedTools.length);
+        console.log('Cached tools data:', cachedToolsData.length);
+        
+        // Switch TO text-only view
+        await showTextOnlyView();
+        isTextOnlyView = true;
+        console.log('RC Tool Commenter: Switched TO text-only view');
+        
+        // Update button
+        toggleButton.innerHTML = `
+            <span>
+                <svg width="16" height="16" viewBox="0 0 16 16" style="margin-right: 6px;">
+                    <path fill="currentColor" d="M0 1.5A.5.5 0 0 1 .5 1H2a.5.5 0 0 1 .485.379L2.89 3H14.5a.5.5 0 0 1 .491.592l-1.5 8A.5.5 0 0 1 13 12H4a.5.5 0 0 1-.491-.408L2.01 3.607 1.61 2H.5a.5.5 0 0 1-.5-.5zM3.102 4l1.313 7h8.17l1.313-7H3.102zM5 12a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm7 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-7 1a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm7 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
+                </svg>
+                Normal View
+            </span>
+        `;
+        toggleButton.title = 'Switch back to normal view';
+    } else {
+        // Switch BACK TO normal view
+        console.log('RC Tool Commenter: Attempting to switch BACK TO normal view');
+        showNormalView();
+        isTextOnlyView = false;
+        console.log('RC Tool Commenter: Switched BACK TO normal view');
+        
+        // Update button
+        toggleButton.innerHTML = `
+            <span>
+                <svg width="16" height="16" viewBox="0 0 16 16" style="margin-right: 6px;">
+                    <path fill="currentColor" d="M1 2.828c.885-.37 2.154-.769 3.388-.893 1.33-.134 2.458.063 3.112.752v9.746c-.935-.53-2.12-.603-3.213-.493-1.18.12-2.37.461-3.287.811V2.828zm7.5-.141c.654-.689 1.782-.886 3.112-.752 1.234.124 2.503.523 3.388.893v9.923c-.918-.35-2.107-.692-3.287-.81-1.094-.111-2.278-.039-3.213.492V2.687zM8 1.783C7.015.936 5.587.81 4.287.94c-1.514.153-3.042.672-3.994 1.105A.5.5 0 0 0 0 2.5v11a.5.5 0 0 0 .707.455c.882-.4 2.303-.881 3.68-1.02 1.409-.142 2.59.087 3.223.877a.5.5 0 0 0 .78 0c.633-.79 1.814-1.019 3.222-.877 1.378.139 2.8.62 3.681 1.02A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.293-.455c-.952-.433-2.48-.952-3.994-1.105C10.413.809 8.985.936 8 1.783z"/>
+                </svg>
+                Text View
+            </span>
+        `;
+        toggleButton.title = 'Toggle between normal and text-only view';
+    }
+}
+
+// Function to show text-only view
+async function showTextOnlyView() {
+    // Use cached tools or get them fresh
+    const tools = cachedTools || getAllTextTools();
+    console.log('Using tools for text-only view:', tools.length);
+    
+    const bodyElement = document.body;
+    const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
+    const weaveId = extractFromUrl('weave') || bodyElement.dataset.weave || 'unknown';
+    
+    // Get suggestions for this weave
+    const storageKey = `rc_suggestions_${expositionId}_${weaveId}`;
+    const result = await browser.storage.local.get(storageKey);
+    const suggestions = result[storageKey] || {};
+    
+    // Create text-only view container
+    const textOnlyContainer = document.createElement('div');
+    textOnlyContainer.id = 'rc-text-only-view';
+    textOnlyContainer.className = 'rc-text-only-container';
+    
+    // Add header
+    const header = document.createElement('div');
+    header.className = 'rc-text-only-header';
+    header.innerHTML = `
+        <h2>Text-Only View</h2>
+        <p>Showing ${tools.length} text tools from current weave</p>
+    `;
+    textOnlyContainer.appendChild(header);
+    
+    // Create scrollable content area
+    const contentArea = document.createElement('div');
+    contentArea.className = 'rc-text-only-content';
+    
+    // Process each tool
+    tools.forEach((tool, index) => {
+        // Use cached tool data if available, otherwise extract fresh
+        const toolData = cachedToolsData ? cachedToolsData[index] : extractToolContent(tool);
+        const toolId = toolData.id || (tool.dataset ? tool.dataset.id : null);
+        
+        if (!toolId) {
+            console.warn('No tool ID found for tool', index);
+            return;
+        }
+        
+        const toolSuggestions = suggestions[toolId] || [];
+        
+        // Create tool item
+        const toolItem = document.createElement('div');
+        toolItem.className = 'rc-text-only-item';
+        toolItem.dataset.originalToolId = toolId;
+        
+        // Add tool header with number and suggestion count
+        const toolHeader = document.createElement('div');
+        toolHeader.className = 'rc-text-only-item-header';
+        toolHeader.innerHTML = `
+            <span class="rc-tool-number">Tool #${index + 1}</span>
+            <span class="rc-tool-id">ID: ${toolId}</span>
+            ${toolSuggestions.length > 0 ? `<span class="rc-suggestion-indicator">${toolSuggestions.length} suggestion${toolSuggestions.length > 1 ? 's' : ''}</span>` : ''}
+        `;
+        
+        // Add suggestion badge if there are suggestions
+        if (toolSuggestions.length > 0) {
+            const badge = document.createElement('div');
+            badge.className = 'rc-suggestion-count rc-text-view-badge';
+            badge.textContent = toolSuggestions.length;
+            badge.addEventListener('click', async () => {
+                // Create a mock tool object for the suggestion viewer
+                const mockTool = { dataset: { id: toolId } };
+                await showToolSuggestions(mockTool);
+            });
+            toolHeader.appendChild(badge);
+        }
+        
+        toolItem.appendChild(toolHeader);
+        
+        // Add tool content
+        const toolContent = document.createElement('div');
+        toolContent.className = 'rc-text-only-item-content';
+        toolContent.innerHTML = toolData.content.html || toolData.content.plainText;
+        
+        // Make content clickable for suggestions
+        toolContent.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            
+            const clickX = event.clientX;
+            const clickY = event.clientY;
+            
+            createTextSuggestionInterface(toolData, clickX, clickY);
+        });
+        
+        toolItem.appendChild(toolContent);
+        contentArea.appendChild(toolItem);
+    });
+    
+    textOnlyContainer.appendChild(contentArea);
+    
+    // Replace body content but keep buttons
+    const buttonsToKeep = [
+        document.getElementById('rc-save-tools-btn'),
+        document.getElementById('rc-import-tools-btn'),
+        document.getElementById('rc-view-toggle-btn'),
+        document.getElementById('rc-file-input')
+    ].filter(btn => btn !== null);
+    
+    // Clear body
+    document.body.innerHTML = '';
+    
+    // Add text-only view
+    document.body.appendChild(textOnlyContainer);
+    
+    // Re-add buttons
+    buttonsToKeep.forEach(button => {
+        document.body.appendChild(button);
+    });
+}
+
+// Function to restore normal view
+function showNormalView() {
+    console.log('RC Tool Commenter: Switching back to normal view');
+    
+    // Reset view state first
+    isTextOnlyView = false;
+    
+    // Remove text-only view container if it exists
+    const textOnlyView = document.getElementById('rc-text-only-view');
+    if (textOnlyView) {
+        textOnlyView.remove();
+    }
+    
+    // Check if we have original content to restore
+    if (!originalPageContent) {
+        console.log('RC Tool Commenter: No original content cached, reloading page');
+        window.location.reload();
+        return;
+    }
+    
+    // Restore the original page content
+    document.body.innerHTML = originalPageContent;
+    
+    // Clear enhancement attributes from all restored tools so they can be re-enhanced
+    const restoredTools = document.querySelectorAll('[data-rc-tool-enhanced]');
+    restoredTools.forEach(tool => {
+        tool.removeAttribute('data-rc-tool-enhanced');
+        console.log('RC Tool Commenter: Cleared enhancement attribute from restored tool:', tool.dataset.id);
+    });
+    
+    // Remove any leftover RC overlays
+    const leftoverOverlays = document.querySelectorAll('.rc-tool-overlay, .rc-suggestion-interface, .rc-text-only-container');
+    leftoverOverlays.forEach(overlay => overlay.remove());
+    
+    // Clear cached data
+    cachedTools = null;
+    cachedToolsData = null;
+    lastToolIdentification = 0;
+    
+    // Re-initialize with a promise-based approach for better control
+    const reinitialize = async () => {
+        try {
+            console.log('RC Tool Commenter: Re-initializing normal view...');
+            console.log('RC Tool Commenter: Page title:', document.title);
+            console.log('RC Tool Commenter: Current URL:', window.location.href);
+            
+            // Wait for DOM to be ready
+            await new Promise(resolve => setTimeout(resolve, 150));
+            
+            // Check if we're still on a valid RC page
+            if (!window.location.href.includes('researchcatalogue.net')) {
+                console.log('RC Tool Commenter: Not on RC page after restore, skipping initialization');
+                return;
+            }
+            
+            // Force tool re-identification (bypass throttling and full init)
+            console.log('RC Tool Commenter: Forcing tool re-identification...');
+            lastToolIdentification = 0; // Reset throttle
+            await identifyTools(); // Force immediate identification
+            
+            console.log('RC Tool Commenter: Normal view restored successfully');
+            
+        } catch (error) {
+            console.error('RC Tool Commenter: Failed to restore normal view:', error);
+            console.log('RC Tool Commenter: Falling back to page reload');
+            // Give user a choice instead of auto-reloading
+            if (confirm('Failed to restore normal view. Reload the page?')) {
+                window.location.reload();
+            }
+        }
+    };
+    
+    reinitialize();
+}
+
 // Function to create text suggestion interface
-function createTextSuggestionInterface(tool, clickX, clickY) {
+function createTextSuggestionInterface(toolOrData, clickX, clickY) {
     // Remove any existing suggestion interface
     const existingSuggestion = document.getElementById('rc-text-suggestion');
     if (existingSuggestion) {
         existingSuggestion.remove();
+    }
+    
+    // Handle both tool DOM elements and tool data objects
+    let tool, toolData;
+    if (toolOrData.dataset) {
+        // This is a DOM element
+        tool = toolOrData;
+        toolData = extractToolContent(tool);
+    } else {
+        // This is already tool data
+        toolData = toolOrData;
+        tool = null;
     }
     
     // Create suggestion overlay
@@ -590,12 +920,20 @@ function createTextSuggestionInterface(tool, clickX, clickY) {
     suggestionOverlay.id = 'rc-text-suggestion';
     suggestionOverlay.className = 'rc-text-suggestion-overlay';
     
-    // Find text content within the tool
-    const textContent = tool.querySelector('.html-text-editor-content');
-    if (!textContent) {
+    // For text-only view, we work with the toolData content directly
+    // For normal view, try to find text content within the tool
+    let textContent = null;
+    if (tool) {
+        textContent = tool.querySelector('.html-text-editor-content');
+    }
+    
+    if (!textContent && !toolData.content) {
         showNotification('No editable text found in this tool');
         return;
     }
+    
+    // Get the HTML content to display
+    const htmlContent = textContent ? textContent.innerHTML : (toolData.content.html || toolData.content.plainText);
     
     // Create suggestion interface HTML
     suggestionOverlay.innerHTML = `
@@ -606,7 +944,7 @@ function createTextSuggestionInterface(tool, clickX, clickY) {
         <div class="rc-suggestion-content">
             <div class="rc-text-selection-area">
                 <p><strong>Instructions:</strong> Select text below to add suggestions</p>
-                <div class="rc-selectable-text" contenteditable="false">${textContent.innerHTML}</div>
+                <div class="rc-selectable-text" contenteditable="false">${htmlContent}</div>
             </div>
             <div class="rc-suggestion-form" style="display: none;">
                 <div class="rc-selected-text-display">
@@ -643,13 +981,13 @@ function createTextSuggestionInterface(tool, clickX, clickY) {
     document.body.appendChild(suggestionOverlay);
     
     // Set up event handlers
-    setupSuggestionEventHandlers(suggestionOverlay, tool);
+    setupSuggestionEventHandlers(suggestionOverlay, tool, toolData);
     
     return suggestionOverlay;
 }
 
 // Function to set up suggestion interface event handlers
-function setupSuggestionEventHandlers(overlay, tool) {
+function setupSuggestionEventHandlers(overlay, tool, toolData) {
     const closeBtn = overlay.querySelector('.rc-close-suggestion');
     const selectableText = overlay.querySelector('.rc-selectable-text');
     const suggestionForm = overlay.querySelector('.rc-suggestion-form');
@@ -701,7 +1039,7 @@ function setupSuggestionEventHandlers(overlay, tool) {
             return;
         }
         
-        await saveSuggestion(tool, currentSelection, suggestionTextarea.value.trim());
+        await saveSuggestion(tool || toolData, currentSelection, suggestionTextarea.value.trim());
         overlay.remove();
         showNotification('Suggestion saved successfully');
     });
@@ -760,11 +1098,22 @@ function clearHighlights(container) {
 }
 
 // Function to save suggestion
-async function saveSuggestion(tool, selection, suggestionText) {
+async function saveSuggestion(toolOrData, selection, suggestionText) {
     const bodyElement = document.body;
     const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
     const weaveId = bodyElement.dataset.weave || extractFromUrl('weave') || 'unknown';
-    const toolId = tool.dataset.id || 'unknown';
+    
+    // Handle both tool DOM elements and tool data objects
+    let toolId, toolType;
+    if (toolOrData.dataset) {
+        // This is a DOM element
+        toolId = toolOrData.dataset.id || 'unknown';
+        toolType = toolOrData.dataset.tool || 'unknown';
+    } else {
+        // This is tool data
+        toolId = toolOrData.id || 'unknown';
+        toolType = toolOrData.type || 'unknown';
+    }
     
     const suggestion = {
         id: `suggestion_${Date.now()}`,
@@ -775,27 +1124,61 @@ async function saveSuggestion(tool, selection, suggestionText) {
         suggestion: suggestionText,
         timestamp: new Date().toISOString(),
         url: window.location.href,
-        toolType: tool.dataset.tool || 'unknown'
+        toolType: toolType
     };
     
-    // Store suggestion in browser storage
-    const storageKey = `rc_suggestions_${expositionId}`;
+    // Store suggestion in browser storage using weave-specific format
+    const storageKey = `rc_suggestions_${expositionId}_${weaveId}`;
     const result = await browser.storage.local.get(storageKey);
-    const suggestions = result[storageKey] || [];
+    const suggestions = result[storageKey] || {};
     
-    suggestions.push(suggestion);
+    // Initialize array for this tool if it doesn't exist
+    if (!suggestions[toolId]) {
+        suggestions[toolId] = [];
+    }
+    
+    suggestions[toolId].push(suggestion);
     await browser.storage.local.set({ [storageKey]: suggestions });
     
     console.log('Saved suggestion:', suggestion);
     
-    // Update tool's stored data to include suggestion count
-    await updateToolWithSuggestionCount(tool);
+    // Update tool's stored data to include suggestion count (only if we have a DOM tool)
+    if (toolOrData.dataset) {
+        await updateToolWithSuggestionCount(toolOrData);
+    }
     
     // Update save button with new suggestion count
     const expositionStorageKey = `rc_exposition_${expositionId}`;
     const expositionResult = await browser.storage.local.get(expositionStorageKey);
     if (expositionResult[expositionStorageKey]) {
         await updateSaveButtonCount(expositionResult[expositionStorageKey]);
+    }
+    
+    // If we're in text-only view, update the suggestion badge for this tool
+    if (isTextOnlyView) {
+        const textOnlyItem = document.querySelector(`[data-original-tool-id="${toolId}"]`);
+        if (textOnlyItem) {
+            // Update or add suggestion badge in text-only view
+            const existingBadge = textOnlyItem.querySelector('.rc-text-view-badge');
+            const toolSuggestions = suggestions[toolId] || [];
+            const newCount = toolSuggestions.length;
+            
+            if (existingBadge) {
+                existingBadge.textContent = newCount;
+            } else if (newCount > 0) {
+                const header = textOnlyItem.querySelector('.rc-text-only-item-header');
+                if (header) {
+                    const badge = document.createElement('div');
+                    badge.className = 'rc-suggestion-count rc-text-view-badge';
+                    badge.textContent = newCount;
+                    badge.addEventListener('click', async () => {
+                        const mockTool = { dataset: { id: toolId } };
+                        await showToolSuggestions(mockTool);
+                    });
+                    header.appendChild(badge);
+                }
+            }
+        }
     }
 }
 
@@ -911,6 +1294,12 @@ function showToolName(toolName, x, y) {
 
 // Function to enhance tools with click handlers
 async function enhanceTools() {
+    // Skip tool enhancement if we're in text-only view
+    if (isTextOnlyView) {
+        console.log('RC Tool Commenter: Skipping tool enhancement - in text-only view');
+        return;
+    }
+    
     const tools = identifyTools();
     
     console.log(`RC Tool Commenter: Found ${tools.length} tools to enhance`);
@@ -1018,6 +1407,12 @@ async function restoreSuggestionBadges(tools) {
 
 // Function to add suggestion badge to a tool
 function addSuggestionBadge(tool, count) {
+    // Safety check: ensure tool is still in the DOM
+    if (!tool || !tool.parentNode) {
+        console.log('Tool is detached from DOM, skipping badge addition');
+        return;
+    }
+    
     // Remove existing badge
     const existing = tool.querySelector('.rc-suggestion-count');
     if (existing) {
@@ -1243,6 +1638,18 @@ async function initializeExtension() {
     }
     
     console.log('RC Tool Commenter: Initializing on exposition page');
+    
+    // Cache CLEAN page content BEFORE any enhancements (only once)
+    if (!isTextOnlyView && !originalPageContent) {
+        originalPageContent = document.body.innerHTML;
+        console.log('RC Tool Commenter: Cached clean page content for view switching');
+    }
+    
+    // Cache tools immediately for text-only view
+    if (!cachedTools) {
+        cachedTools = getAllTextTools();
+        console.log('Initial cache of tools for text-only view:', cachedTools.length);
+    }
     
     // Debug: Check all available tools on the page
     const allTools = document.querySelectorAll('[class*="tool-"]');
