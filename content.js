@@ -69,13 +69,30 @@ function identifyTools() {
     return tools;
 }
 
+// Function to extract exposition and weave IDs from URL
+function extractFromUrl(type) {
+    const url = window.location.href;
+    const match = url.match(/\/view\/(\d+)\/(\d+)/);
+    if (match) {
+        return type === 'exposition' ? match[1] : match[2];
+    }
+    return null;
+}
+
 // Function to extract tool content
 function extractToolContent(tool) {
+    // Extract exposition and weave IDs from the page
+    const bodyElement = document.body;
+    const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
+    const weaveId = bodyElement.dataset.weave || extractFromUrl('weave') || 'unknown';
+    
     const toolData = {
         id: tool.dataset.id || 'unknown',
         type: tool.dataset.tool || 'unknown',
         title: tool.dataset.title || '',
         className: tool.className,
+        expositionId: expositionId,
+        weaveId: weaveId,
         content: ''
     };
     
@@ -139,11 +156,19 @@ function createSaveButton() {
 // Function to save tools as JSON
 function saveToolsAsJSON() {
     const tools = document.querySelectorAll('[data-rc-tool-enhanced="true"]');
+    
+    // Extract exposition and weave IDs
+    const bodyElement = document.body;
+    const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
+    const weaveId = bodyElement.dataset.weave || extractFromUrl('weave') || 'unknown';
+    
     const toolsData = {
         page: {
             url: window.location.href,
             title: document.title,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            expositionId: expositionId,
+            weaveId: weaveId
         },
         tools: []
     };
@@ -393,122 +418,3 @@ if (document.readyState === 'loading') {
 
 // Also run after a delay for dynamic content
 setTimeout(initializeExtension, 2000);
-
-// Function to extract tool content
-function extractToolContent(tool) {
-    const toolData = {
-        id: tool.dataset.id || 'unknown',
-        type: tool.dataset.tool || 'unknown',
-        title: tool.dataset.title || '',
-        className: tool.className,
-        content: ''
-    };
-    
-    // Extract text content based on tool type
-    if (tool.dataset.tool === 'text') {
-        const textContent = tool.querySelector('.html-text-editor-content');
-        if (textContent) {
-            // Get both plain text and HTML content
-            toolData.content = {
-                plainText: textContent.innerText.trim(),
-                html: textContent.innerHTML.trim()
-            };
-        }
-    }
-    
-    // Add position/style info
-    const rect = tool.getBoundingClientRect();
-    toolData.position = {
-        x: rect.x,
-        y: rect.y,
-        width: rect.width,
-        height: rect.height
-    };
-    
-    // Add data attributes
-    toolData.dataAttributes = {};
-    for (let attr of tool.attributes) {
-        if (attr.name.startsWith('data-')) {
-            toolData.dataAttributes[attr.name] = attr.value;
-        }
-    }
-    
-    return toolData;
-}
-
-// Function to create save button
-function createSaveButton() {
-    // Remove existing button if present
-    const existingButton = document.getElementById('rc-save-tools-btn');
-    if (existingButton) {
-        existingButton.remove();
-    }
-    
-    const saveButton = document.createElement('button');
-    saveButton.id = 'rc-save-tools-btn';
-    saveButton.className = 'rc-save-button';
-    saveButton.innerHTML = `
-        <svg width="16" height="16" viewBox="0 0 16 16" style="margin-right: 6px;">
-            <path fill="currentColor" d="M13 0H3a3 3 0 0 0-3 3v10a3 3 0 0 0 3-3V3a3 3 0 0 0-3-3zM8 1.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zM11 14.5H5a.5.5 0 0 1 0-1h6a.5.5 0 0 1 0 1z"/>
-        </svg>
-        Save Tools as JSON
-    `;
-    
-    saveButton.addEventListener('click', () => {
-        saveToolsAsJSON();
-    });
-    
-    document.body.appendChild(saveButton);
-}
-
-// Function to save tools as JSON
-function saveToolsAsJSON() {
-    const tools = document.querySelectorAll('[data-rc-tool-enhanced="true"]');
-    const toolsData = {
-        page: {
-            url: window.location.href,
-            title: document.title,
-            timestamp: new Date().toISOString()
-        },
-        tools: []
-    };
-    
-    tools.forEach((tool, index) => {
-        const toolData = extractToolContent(tool);
-        toolsData.tools.push(toolData);
-    });
-    
-    // Create downloadable JSON file
-    const jsonString = JSON.stringify(toolsData, null, 2);
-    const blob = new Blob([jsonString], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    
-    // Create download link
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `rc-tools-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    
-    // Show confirmation
-    showNotification(`Saved ${toolsData.tools.length} tools to JSON file`);
-}
-
-// Function to show notification
-function showNotification(message) {
-    const notification = document.createElement('div');
-    notification.className = 'rc-notification';
-    notification.textContent = message;
-    document.body.appendChild(notification);
-    
-    setTimeout(() => {
-        notification.style.opacity = '0';
-        setTimeout(() => {
-            if (notification.parentNode) {
-                notification.remove();
-            }
-        }, 300);
-    }, 3000);
-}
