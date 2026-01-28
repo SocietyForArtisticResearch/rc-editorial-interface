@@ -140,3 +140,204 @@
         max-width: 200px;
     }
 }
+
+/* Text Suggestion Interface Styles */
+.rc-text-suggestion-overlay {
+    font-family: 'Lato', Arial, sans-serif;
+    line-height: 1.4;
+}
+
+.rc-suggestion-header {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    color: white;
+    padding: 12px 16px;
+    border-radius: 6px 6px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.rc-suggestion-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.rc-close-suggestion {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s;
+}
+
+.rc-close-suggestion:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.rc-suggestion-content {
+    padding: 16px;
+}
+
+.rc-text-selection-area {
+    margin-bottom: 16px;
+}
+
+.rc-text-selection-area p {
+    margin: 0 0 12px 0;
+    color: #666;
+    font-size: 13px;
+}
+
+.rc-selectable-text {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 12px;
+    max-height: 200px;
+    overflow-y: auto;
+    background: #f8f9fa;
+    font-size: 14px;
+    line-height: 1.5;
+    user-select: text;
+    cursor: text;
+}
+
+.rc-selectable-text::-webkit-scrollbar {
+    width: 6px;
+}
+
+.rc-selectable-text::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.rc-selectable-text::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 3px;
+}
+
+.rc-suggestion-form {
+    border-top: 1px solid #eee;
+    padding-top: 16px;
+}
+
+.rc-selected-text-display {
+    margin-bottom: 12px;
+}
+
+.rc-selected-text-display label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: #333;
+    font-size: 13px;
+}
+
+.rc-selected-text {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 4px;
+    padding: 8px 10px;
+    font-style: italic;
+    color: #856404;
+    font-size: 14px;
+}
+
+.rc-suggestion-input {
+    margin-bottom: 16px;
+}
+
+.rc-suggestion-input label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: #333;
+    font-size: 13px;
+}
+
+#rc-suggestion-text {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.4;
+    resize: vertical;
+    transition: border-color 0.2s;
+}
+
+#rc-suggestion-text:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
+}
+
+.rc-suggestion-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.rc-save-suggestion, .rc-cancel-suggestion {
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid;
+    transition: all 0.2s;
+}
+
+.rc-save-suggestion {
+    background: #28a745;
+    color: white;
+    border-color: #28a745;
+}
+
+.rc-save-suggestion:hover {
+    background: #218838;
+    border-color: #218838;
+}
+
+.rc-cancel-suggestion {
+    background: #6c757d;
+    color: white;
+    border-color: #6c757d;
+}
+
+.rc-cancel-suggestion:hover {
+    background: #5a6268;
+    border-color: #5a6268;
+}
+
+.rc-text-highlight {
+    background: rgba(255, 235, 59, 0.6) !important;
+    border: 1px solid rgba(255, 193, 7, 0.8) !important;
+    border-radius: 2px !important;
+    padding: 1px 2px !important;
+}
+
+.rc-suggestion-count {
+    position: absolute !important;
+    top: -8px !important;
+    right: -8px !important;
+    background: #dc3545 !important;
+    color: white !important;
+    border-radius: 50% !important;
+    width: 20px !important;
+    height: 20px !important;
+    font-size: 11px !important;
+    font-weight: bold !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 10 !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3) !important;
+}

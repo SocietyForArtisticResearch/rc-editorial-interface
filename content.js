@@ -170,13 +170,21 @@ async function storeToolsInMemory(tools) {
     console.log(`Stored exposition data:`, expositionData);
     
     // Update button text to show total count across all weaves
-    updateSaveButtonCount(expositionData);
+    await updateSaveButtonCount(expositionData);
 }
 
 // Function to update save button with total tool count
-function updateSaveButtonCount(expositionData) {
+async function updateSaveButtonCount(expositionData) {
     const saveButton = document.getElementById('rc-save-tools-btn');
     if (!saveButton) return;
+    
+    const bodyElement = document.body;
+    const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
+    
+    // Get suggestion count
+    const suggestionsKey = `rc_suggestions_${expositionId}`;
+    const suggestionsResult = await browser.storage.local.get(suggestionsKey);
+    const suggestions = suggestionsResult[suggestionsKey] || [];
     
     let totalTools = 0;
     let weaveCount = 0;
@@ -191,7 +199,7 @@ function updateSaveButtonCount(expositionData) {
         <svg width="16" height="16" viewBox="0 0 16 16" style="margin-right: 6px;">
             <path fill="currentColor" d="M13 0H3a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V3a3 3 0 0 0-3-3zM8 1.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zM11 14.5H5a.5.5 0 0 1 0-1h6a.5.5 0 0 1 0 1z"/>
         </svg>
-        Save ${totalTools} Tools (${weaveCount} weaves)
+        Save ${totalTools} Tools, ${suggestions.length} Suggestions (${weaveCount} weaves)
     `;
 }
 
@@ -232,10 +240,24 @@ async function saveAllToolsAsJSON() {
     const result = await browser.storage.local.get(storageKey);
     const expositionData = result[storageKey];
     
+    // Get stored suggestions for this exposition
+    const suggestionsKey = `rc_suggestions_${expositionId}`;
+    const suggestionsResult = await browser.storage.local.get(suggestionsKey);
+    const suggestions = suggestionsResult[suggestionsKey] || [];
+    
     if (!expositionData || !expositionData.weaves || Object.keys(expositionData.weaves).length === 0) {
         showNotification('No tools found to save');
         return;
     }
+    
+    // Group suggestions by tool ID
+    const suggestionsByTool = {};
+    suggestions.forEach(suggestion => {
+        if (!suggestionsByTool[suggestion.toolId]) {
+            suggestionsByTool[suggestion.toolId] = [];
+        }
+        suggestionsByTool[suggestion.toolId].push(suggestion);
+    });
     
     // Create comprehensive JSON structure
     const exportData = {
@@ -243,20 +265,36 @@ async function saveAllToolsAsJSON() {
             id: expositionId,
             exportTimestamp: new Date().toISOString(),
             totalWeaves: Object.keys(expositionData.weaves).length,
-            totalTools: Object.values(expositionData.weaves).reduce((sum, weave) => sum + weave.tools.length, 0)
+            totalTools: Object.values(expositionData.weaves).reduce((sum, weave) => sum + weave.tools.length, 0),
+            totalSuggestions: suggestions.length
         },
-        weaves: {}
+        weaves: {},
+        suggestions: {
+            total: suggestions.length,
+            byTool: suggestionsByTool,
+            all: suggestions
+        }
     };
     
-    // Organize tools by weave
+    // Organize tools by weave and add suggestion counts
     Object.entries(expositionData.weaves).forEach(([weaveId, weaveData]) => {
+        const toolsWithSuggestions = weaveData.tools.map(tool => {
+            const toolSuggestions = suggestionsByTool[tool.id] || [];
+            return {
+                ...tool,
+                suggestionCount: toolSuggestions.length,
+                suggestions: toolSuggestions
+            };
+        });
+        
         exportData.weaves[weaveId] = {
             weaveId: weaveId,
             url: weaveData.url,
             pageTitle: weaveData.pageTitle,
             lastVisited: weaveData.lastVisited,
             toolCount: weaveData.tools.length,
-            tools: weaveData.tools
+            suggestionCount: toolsWithSuggestions.reduce((sum, tool) => sum + tool.suggestionCount, 0),
+            tools: toolsWithSuggestions
         };
     });
     
@@ -277,12 +315,252 @@ async function saveAllToolsAsJSON() {
     // Show confirmation
     const weaveCount = Object.keys(expositionData.weaves).length;
     const toolCount = Object.values(expositionData.weaves).reduce((sum, weave) => sum + weave.tools.length, 0);
-    showNotification(`Saved ${toolCount} tools from ${weaveCount} weaves`);
+    const suggestionCount = suggestions.length;
+    showNotification(`Saved ${toolCount} tools and ${suggestionCount} suggestions from ${weaveCount} weaves`);
 }
 
 // Function to save tools as JSON (legacy - keeping for backwards compatibility)
 function saveToolsAsJSON() {
     saveAllToolsAsJSON();
+}
+
+// Function to create text suggestion interface
+function createTextSuggestionInterface(tool, clickX, clickY) {
+    // Remove any existing suggestion interface
+    const existingSuggestion = document.getElementById('rc-text-suggestion');
+    if (existingSuggestion) {
+        existingSuggestion.remove();
+    }
+    
+    // Create suggestion overlay
+    const suggestionOverlay = document.createElement('div');
+    suggestionOverlay.id = 'rc-text-suggestion';
+    suggestionOverlay.className = 'rc-text-suggestion-overlay';
+    
+    // Find text content within the tool
+    const textContent = tool.querySelector('.html-text-editor-content');
+    if (!textContent) {
+        showNotification('No editable text found in this tool');
+        return;
+    }
+    
+    // Create suggestion interface HTML
+    suggestionOverlay.innerHTML = `
+        <div class="rc-suggestion-header">
+            <h3>Suggest Text Edits</h3>
+            <button class="rc-close-suggestion" title="Close">×</button>
+        </div>
+        <div class="rc-suggestion-content">
+            <div class="rc-text-selection-area">
+                <p><strong>Instructions:</strong> Select text below to add suggestions</p>
+                <div class="rc-selectable-text" contenteditable="false">${textContent.innerHTML}</div>
+            </div>
+            <div class="rc-suggestion-form" style="display: none;">
+                <div class="rc-selected-text-display">
+                    <label>Selected text:</label>
+                    <div class="rc-selected-text"></div>
+                </div>
+                <div class="rc-suggestion-input">
+                    <label for="rc-suggestion-text">Your suggestion:</label>
+                    <textarea id="rc-suggestion-text" placeholder="Suggest changes for the selected text..." rows="3"></textarea>
+                </div>
+                <div class="rc-suggestion-actions">
+                    <button class="rc-save-suggestion">Save Suggestion</button>
+                    <button class="rc-cancel-suggestion">Cancel</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Position overlay
+    suggestionOverlay.style.cssText = `
+        position: fixed;
+        top: 50px;
+        right: 20px;
+        width: 400px;
+        max-height: 80vh;
+        background: white;
+        border: 2px solid #007bff;
+        border-radius: 8px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+        z-index: 10000;
+        overflow-y: auto;
+    `;
+    
+    document.body.appendChild(suggestionOverlay);
+    
+    // Set up event handlers
+    setupSuggestionEventHandlers(suggestionOverlay, tool);
+    
+    return suggestionOverlay;
+}
+
+// Function to set up suggestion interface event handlers
+function setupSuggestionEventHandlers(overlay, tool) {
+    const closeBtn = overlay.querySelector('.rc-close-suggestion');
+    const selectableText = overlay.querySelector('.rc-selectable-text');
+    const suggestionForm = overlay.querySelector('.rc-suggestion-form');
+    const selectedTextDisplay = overlay.querySelector('.rc-selected-text');
+    const suggestionTextarea = overlay.querySelector('#rc-suggestion-text');
+    const saveBtn = overlay.querySelector('.rc-save-suggestion');
+    const cancelBtn = overlay.querySelector('.rc-cancel-suggestion');
+    
+    let currentSelection = null;
+    
+    // Close button
+    closeBtn.addEventListener('click', () => {
+        overlay.remove();
+    });
+    
+    // Text selection handling
+    selectableText.addEventListener('mouseup', () => {
+        const selection = window.getSelection();
+        const selectedText = selection.toString().trim();
+        
+        if (selectedText.length > 0) {
+            // Check if selection is within our selectable area
+            const range = selection.getRangeAt(0);
+            if (selectableText.contains(range.commonAncestorContainer)) {
+                currentSelection = {
+                    text: selectedText,
+                    range: range.cloneRange(),
+                    startOffset: range.startOffset,
+                    endOffset: range.endOffset,
+                    startContainer: range.startContainer,
+                    endContainer: range.endContainer
+                };
+                
+                // Highlight selected text
+                highlightSelectedText(range, selectableText);
+                
+                // Show suggestion form
+                selectedTextDisplay.textContent = selectedText;
+                suggestionForm.style.display = 'block';
+                suggestionTextarea.focus();
+            }
+        }
+    });
+    
+    // Save suggestion
+    saveBtn.addEventListener('click', async () => {
+        if (!currentSelection || !suggestionTextarea.value.trim()) {
+            showNotification('Please select text and enter a suggestion');
+            return;
+        }
+        
+        await saveSuggestion(tool, currentSelection, suggestionTextarea.value.trim());
+        overlay.remove();
+        showNotification('Suggestion saved successfully');
+    });
+    
+    // Cancel suggestion
+    cancelBtn.addEventListener('click', () => {
+        suggestionForm.style.display = 'none';
+        clearHighlights(selectableText);
+        currentSelection = null;
+    });
+    
+    // Close on escape key
+    document.addEventListener('keydown', function escapeHandler(e) {
+        if (e.key === 'Escape') {
+            overlay.remove();
+            document.removeEventListener('keydown', escapeHandler);
+        }
+    });
+}
+
+// Function to highlight selected text
+function highlightSelectedText(range, container) {
+    // Clear previous highlights
+    clearHighlights(container);
+    
+    // Create highlight span
+    const highlight = document.createElement('span');
+    highlight.className = 'rc-text-highlight';
+    highlight.style.cssText = `
+        background: rgba(255, 235, 59, 0.6);
+        border: 1px solid rgba(255, 193, 7, 0.8);
+        border-radius: 2px;
+        padding: 1px 2px;
+    `;
+    
+    try {
+        range.surroundContents(highlight);
+    } catch (e) {
+        // Fallback for complex selections
+        const contents = range.extractContents();
+        highlight.appendChild(contents);
+        range.insertNode(highlight);
+    }
+}
+
+// Function to clear text highlights
+function clearHighlights(container) {
+    const highlights = container.querySelectorAll('.rc-text-highlight');
+    highlights.forEach(highlight => {
+        const parent = highlight.parentNode;
+        while (highlight.firstChild) {
+            parent.insertBefore(highlight.firstChild, highlight);
+        }
+        parent.removeChild(highlight);
+    });
+}
+
+// Function to save suggestion
+async function saveSuggestion(tool, selection, suggestionText) {
+    const bodyElement = document.body;
+    const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
+    const weaveId = bodyElement.dataset.weave || extractFromUrl('weave') || 'unknown';
+    const toolId = tool.dataset.id || 'unknown';
+    
+    const suggestion = {
+        id: `suggestion_${Date.now()}`,
+        toolId: toolId,
+        expositionId: expositionId,
+        weaveId: weaveId,
+        selectedText: selection.text,
+        suggestion: suggestionText,
+        timestamp: new Date().toISOString(),
+        url: window.location.href,
+        toolType: tool.dataset.tool || 'unknown'
+    };
+    
+    // Store suggestion in browser storage
+    const storageKey = `rc_suggestions_${expositionId}`;
+    const result = await browser.storage.local.get(storageKey);
+    const suggestions = result[storageKey] || [];
+    
+    suggestions.push(suggestion);
+    await browser.storage.local.set({ [storageKey]: suggestions });
+    
+    console.log('Saved suggestion:', suggestion);
+    
+    // Update tool's stored data to include suggestion count
+    await updateToolWithSuggestionCount(tool);
+    
+    // Update save button with new suggestion count
+    const expositionStorageKey = `rc_exposition_${expositionId}`;
+    const expositionResult = await browser.storage.local.get(expositionStorageKey);
+    if (expositionResult[expositionStorageKey]) {
+        await updateSaveButtonCount(expositionResult[expositionStorageKey]);
+    }
+}
+
+// Function to update tool with suggestion count
+async function updateToolWithSuggestionCount(tool) {
+    const bodyElement = document.body;
+    const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
+    const toolId = tool.dataset.id || 'unknown';
+    
+    // Get suggestions for this tool
+    const storageKey = `rc_suggestions_${expositionId}`;
+    const result = await browser.storage.local.get(storageKey);
+    const suggestions = result[storageKey] || [];
+    
+    const toolSuggestions = suggestions.filter(s => s.toolId === toolId);
+    
+    // Use the centralized badge function
+    addSuggestionBadge(tool, toolSuggestions.length);
 }
 
 // Function to show notification
@@ -378,15 +656,18 @@ function showToolName(toolName, x, y) {
 }
 
 // Function to enhance tools with click handlers
-function enhanceTools() {
+async function enhanceTools() {
     const tools = identifyTools();
     
     console.log(`RC Tool Commenter: Found ${tools.length} tools to enhance`);
     
     // Store found tools in memory for cross-weave collection
     if (tools.length > 0) {
-        storeToolsInMemory(tools);
+        await storeToolsInMemory(tools);
     }
+    
+    // Restore suggestion badges for tools that have suggestions
+    await restoreSuggestionBadges(tools);
     
     tools.forEach((tool, index) => {
         // Mark as enhanced to avoid duplicate processing
@@ -425,13 +706,20 @@ function enhanceTools() {
             event.preventDefault();
             event.stopPropagation();
             
-            const toolName = getToolName(tool);
-            const rect = tool.getBoundingClientRect();
-            const x = event.clientX;
-            const y = event.clientY - 40; // Position above cursor
+            const toolType = tool.dataset.tool;
             
-            console.log(`RC Tool Commenter: Clicked on tool "${toolName}"`);
-            showToolName(toolName, x, y);
+            // For text tools, open suggestion interface
+            if (toolType === 'text' || toolType === 'simpletext') {
+                createTextSuggestionInterface(tool, event.clientX, event.clientY);
+            } else {
+                // For other tools, show tooltip as before
+                const toolName = getToolName(tool);
+                const x = event.clientX;
+                const y = event.clientY - 40;
+                
+                console.log(`RC Tool Commenter: Clicked on tool "${toolName}"`);
+                showToolName(toolName, x, y);
+            }
         });
         
         // Add hover effect
@@ -451,6 +739,69 @@ function enhanceTools() {
             }
         });
     });
+}
+
+// Function to restore suggestion badges when navigating between weaves
+async function restoreSuggestionBadges(tools) {
+    const bodyElement = document.body;
+    const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
+    
+    // Get all suggestions for this exposition
+    const storageKey = `rc_suggestions_${expositionId}`;
+    const result = await browser.storage.local.get(storageKey);
+    const suggestions = result[storageKey] || [];
+    
+    // Group suggestions by tool ID
+    const suggestionsByTool = {};
+    suggestions.forEach(suggestion => {
+        if (!suggestionsByTool[suggestion.toolId]) {
+            suggestionsByTool[suggestion.toolId] = [];
+        }
+        suggestionsByTool[suggestion.toolId].push(suggestion);
+    });
+    
+    // Add badges to tools that have suggestions
+    tools.forEach(tool => {
+        const toolId = tool.dataset.id;
+        if (toolId && suggestionsByTool[toolId]) {
+            const suggestionCount = suggestionsByTool[toolId].length;
+            addSuggestionBadge(tool, suggestionCount);
+        }
+    });
+}
+
+// Function to add suggestion badge to a tool
+function addSuggestionBadge(tool, count) {
+    // Remove existing badge
+    const existing = tool.querySelector('.rc-suggestion-count');
+    if (existing) {
+        existing.remove();
+    }
+    
+    if (count > 0) {
+        const badge = document.createElement('div');
+        badge.className = 'rc-suggestion-count';
+        badge.textContent = count;
+        badge.style.cssText = `
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #dc3545;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 11px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        `;
+        
+        tool.appendChild(badge);
+    }
 }
 
 // Function to initialize the extension
@@ -480,7 +831,7 @@ async function initializeExtension() {
     
     // Update button with existing counts if available
     if (result[storageKey]) {
-        updateSaveButtonCount(result[storageKey]);
+        await updateSaveButtonCount(result[storageKey]);
     }
     
     // Watch for dynamically added content
