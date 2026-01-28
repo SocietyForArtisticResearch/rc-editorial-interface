@@ -785,6 +785,12 @@ async function showTextOnlyView() {
         
         // Make content clickable for suggestions
         toolContent.addEventListener('click', (event) => {
+            // If Cmd key is pressed, allow normal interaction (don't prevent default)
+            if (event.metaKey) {
+                console.log('RC Tool Commenter: Cmd+click detected, allowing normal interaction');
+                return; // Let the event bubble normally
+            }
+            
             event.preventDefault();
             event.stopPropagation();
             
@@ -1346,6 +1352,12 @@ async function enhanceTools() {
         
         // Add click handler
         tool.addEventListener('click', (event) => {
+            // If Cmd key is pressed, allow normal interaction (don't prevent default)
+            if (event.metaKey) {
+                console.log('RC Tool Commenter: Cmd+click detected, allowing normal interaction');
+                return; // Let the event bubble normally
+            }
+            
             event.preventDefault();
             event.stopPropagation();
             
