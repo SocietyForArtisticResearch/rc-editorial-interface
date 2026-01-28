@@ -204,16 +204,36 @@ async function storeToolsInMemory(tools) {
     
     // Prepare tools data for current weave
     const weaveTools = [];
+    
+    // Get suggestions for this weave
+    const suggestionsKey = `rc_suggestions_${expositionId}_${weaveId}`;
+    console.log('RC Tool Commenter: Looking for suggestions with key:', suggestionsKey);
+    const suggestionsResult = await browser.storage.local.get(suggestionsKey);
+    const suggestions = suggestionsResult[suggestionsKey] || {};
+    console.log('RC Tool Commenter: Found suggestions:', suggestions);
+    
     tools.forEach(tool => {
         const toolData = extractToolContent(tool);
+        
+        // Add suggestions for this tool
+        const toolId = toolData.id;
+        console.log(`RC Tool Commenter: Processing tool ${toolId}, looking for suggestions...`);
+        toolData.suggestions = suggestions[toolId] || [];
+        toolData.suggestionCount = toolData.suggestions.length;
+        console.log(`RC Tool Commenter: Tool ${toolId} has ${toolData.suggestionCount} suggestions:`, toolData.suggestions);
+        
         weaveTools.push(toolData);
     });
     
     // Store tools organized by weave
+    const totalSuggestions = weaveTools.reduce((sum, tool) => sum + tool.suggestionCount, 0);
+    
     expositionData.weaves[weaveId] = {
         weaveId: weaveId,
         url: window.location.href,
         tools: weaveTools,
+        toolCount: weaveTools.length,
+        suggestionCount: totalSuggestions,
         lastVisited: new Date().toISOString(),
         pageTitle: document.title
     };
@@ -350,23 +370,22 @@ async function saveAllToolsAsJSON() {
     const result = await browser.storage.local.get(storageKey);
     const expositionData = result[storageKey];
     
-    // Get stored suggestions for this exposition
-    const suggestionsKey = `rc_suggestions_${expositionId}`;
-    const suggestionsResult = await browser.storage.local.get(suggestionsKey);
-    const suggestions = suggestionsResult[suggestionsKey] || [];
-    
     if (!expositionData || !expositionData.weaves || Object.keys(expositionData.weaves).length === 0) {
         showNotification('No tools found to save');
         return;
     }
     
-    // Group suggestions by tool ID
-    const suggestionsByTool = {};
-    suggestions.forEach(suggestion => {
-        if (!suggestionsByTool[suggestion.toolId]) {
-            suggestionsByTool[suggestion.toolId] = [];
-        }
-        suggestionsByTool[suggestion.toolId].push(suggestion);
+    console.log('RC Tool Commenter: Exporting exposition data:', expositionData);
+    
+    // Calculate totals from the stored data (suggestions are already attached to tools)
+    let totalTools = 0;
+    let totalSuggestions = 0;
+    
+    Object.values(expositionData.weaves).forEach(weave => {
+        totalTools += weave.tools.length;
+        weave.tools.forEach(tool => {
+            totalSuggestions += tool.suggestionCount || 0;
+        });
     });
     
     // Create comprehensive JSON structure
@@ -375,38 +394,11 @@ async function saveAllToolsAsJSON() {
             id: expositionId,
             exportTimestamp: new Date().toISOString(),
             totalWeaves: Object.keys(expositionData.weaves).length,
-            totalTools: Object.values(expositionData.weaves).reduce((sum, weave) => sum + weave.tools.length, 0),
-            totalSuggestions: suggestions.length
+            totalTools: totalTools,
+            totalSuggestions: totalSuggestions
         },
-        weaves: {},
-        suggestions: {
-            total: suggestions.length,
-            byTool: suggestionsByTool,
-            all: suggestions
-        }
+        weaves: expositionData.weaves  // Use the weaves data as-is since it already contains suggestions
     };
-    
-    // Organize tools by weave and add suggestion counts
-    Object.entries(expositionData.weaves).forEach(([weaveId, weaveData]) => {
-        const toolsWithSuggestions = weaveData.tools.map(tool => {
-            const toolSuggestions = suggestionsByTool[tool.id] || [];
-            return {
-                ...tool,
-                suggestionCount: toolSuggestions.length,
-                suggestions: toolSuggestions
-            };
-        });
-        
-        exportData.weaves[weaveId] = {
-            weaveId: weaveId,
-            url: weaveData.url,
-            pageTitle: weaveData.pageTitle,
-            lastVisited: weaveData.lastVisited,
-            toolCount: weaveData.tools.length,
-            suggestionCount: toolsWithSuggestions.reduce((sum, tool) => sum + tool.suggestionCount, 0),
-            tools: toolsWithSuggestions
-        };
-    });
     
     // Create downloadable JSON file
     const jsonString = JSON.stringify(exportData, null, 2);
@@ -654,6 +646,7 @@ let originalPageContent = null;
 let cachedTools = null;
 let cachedToolsData = null;
 let lastToolIdentification = 0;
+let toolsStoredForCurrentWeave = false; // Flag to prevent repeated storage calls
 
 // Function to toggle between normal and text-only view
 async function toggleTextOnlyView() {
@@ -886,6 +879,10 @@ function showNormalView() {
             lastToolIdentification = 0; // Reset throttle
             await identifyTools(); // Force immediate identification
             
+            // Re-initialize RC navigation functionality
+            console.log('RC Tool Commenter: Re-initializing RC navigation...');
+            reinitializeRCNavigation();
+            
             console.log('RC Tool Commenter: Normal view restored successfully');
             
         } catch (error) {
@@ -899,6 +896,162 @@ function showNormalView() {
     };
     
     reinitialize();
+}
+
+// Function to re-initialize Research Catalogue's navigation functionality
+function reinitializeRCNavigation() {
+    try {
+        console.log('RC Tool Commenter: Debugging navigation structure...');
+        
+        // Debug: Check what navigation elements exist
+        const navigation = document.querySelector('#navigation');
+        if (navigation) {
+            console.log('Navigation found:', navigation);
+            console.log('Navigation HTML:', navigation.outerHTML.substring(0, 500) + '...');
+        } else {
+            console.log('Navigation element not found!');
+        }
+        
+        // Check for main menu
+        const mainMenu = document.querySelector('.mainmenu');
+        if (mainMenu) {
+            console.log('Main menu found:', mainMenu);
+            console.log('Main menu display style:', mainMenu.style.display);
+        } else {
+            console.log('Main menu not found!');
+        }
+        
+        // Check for menu items
+        const menuItems = document.querySelectorAll('.menu');
+        console.log('Menu items found:', menuItems.length);
+        menuItems.forEach((item, index) => {
+            console.log(`Menu item ${index}:`, item.className, item.querySelector('.caption')?.textContent);
+        });
+        
+        // Re-attach the menu toggle functionality
+        const menuToggleLinks = document.querySelectorAll('a[onclick*="next(\'ul\').toggle()"]');
+        console.log('Found menu toggle links:', menuToggleLinks.length);
+        menuToggleLinks.forEach(link => {
+            // Remove the onclick attribute and add proper event listener
+            link.removeAttribute('onclick');
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const nextUl = this.nextElementSibling;
+                if (nextUl && nextUl.tagName === 'UL') {
+                    if (nextUl.style.display === 'none' || !nextUl.style.display) {
+                        nextUl.style.display = 'block';
+                    } else {
+                        nextUl.style.display = 'none';
+                    }
+                }
+                return false;
+            });
+        });
+        
+        // Re-attach chapter highlighting functionality
+        const chapterLinks = document.querySelectorAll('a.chapter-entry[onclick*="highlightChapter"]');
+        console.log('Found chapter links:', chapterLinks.length);
+        chapterLinks.forEach(link => {
+            // Remove the onclick attribute and add proper event listener
+            link.removeAttribute('onclick');
+            link.addEventListener('click', function(e) {
+                // Remove highlight from all chapter entries
+                document.querySelectorAll('a.chapter-entry').forEach(chapter => {
+                    chapter.classList.remove('highlighted');
+                });
+                // Add highlight to current chapter
+                this.classList.add('highlighted');
+            });
+        });
+        
+        // Re-attach main menu icon functionality
+        const menuIcon = document.querySelector('#page-menu-icon');
+        const menuList = document.querySelector('#page-menu-list');
+        if (menuIcon && menuList) {
+            console.log('Menu icon and list found');
+            // Remove any existing onclick
+            menuIcon.removeAttribute('onclick');
+            menuIcon.addEventListener('click', function(e) {
+                e.preventDefault();
+                console.log('Menu icon clicked');
+                if (menuList.style.display === 'none' || !menuList.style.display) {
+                    menuList.style.display = 'block';
+                } else {
+                    menuList.style.display = 'none';
+                }
+            });
+        } else {
+            console.log('Menu icon or list not found:', !!menuIcon, !!menuList);
+        }
+        
+        console.log('RC Tool Commenter: Successfully re-initialized RC navigation');
+        
+        // Force CSS hover functionality by adding explicit styles
+        addNavigationCSS();
+        
+    } catch (error) {
+        console.error('RC Tool Commenter: Failed to re-initialize RC navigation:', error);
+    }
+}
+
+// Function to add/restore navigation CSS functionality
+function addNavigationCSS() {
+    try {
+        // Check if our navigation CSS already exists
+        let navStyle = document.getElementById('rc-navigation-fix');
+        if (!navStyle) {
+            navStyle = document.createElement('style');
+            navStyle.id = 'rc-navigation-fix';
+            navStyle.textContent = `
+                /* Restore navigation hover functionality */
+                .mainmenu .menu {
+                    position: relative;
+                }
+                
+                .mainmenu .menu .submenu {
+                    display: none !important;
+                    position: absolute;
+                    top: 100%;
+                    left: 0;
+                    background: white;
+                    border: 1px solid #ccc;
+                    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                    z-index: 1000;
+                    min-width: 200px;
+                    padding: 10px;
+                }
+                
+                .mainmenu .menu:hover .submenu {
+                    display: block !important;
+                }
+                
+                .mainmenu .menu.menu-home .submenu {
+                    background: white;
+                    padding: 15px;
+                }
+                
+                .mainmenu .menu.menu-home .submenu li {
+                    list-style: none;
+                    margin: 5px 0;
+                }
+                
+                .mainmenu .menu.menu-home .submenu a {
+                    text-decoration: none;
+                    color: #333;
+                    display: block;
+                    padding: 3px 0;
+                }
+                
+                .mainmenu .menu.menu-home .submenu a:hover {
+                    background-color: #f0f0f0;
+                }
+            `;
+            document.head.appendChild(navStyle);
+            console.log('RC Tool Commenter: Added navigation CSS fix');
+        }
+    } catch (error) {
+        console.error('RC Tool Commenter: Failed to add navigation CSS:', error);
+    }
 }
 
 // Function to create text suggestion interface
@@ -1040,14 +1193,34 @@ function setupSuggestionEventHandlers(overlay, tool, toolData) {
     
     // Save suggestion
     saveBtn.addEventListener('click', async () => {
+        console.log('RC Tool Commenter: Save button clicked');
+        console.log('Current selection:', currentSelection);
+        console.log('Suggestion text:', suggestionTextarea.value.trim());
+        console.log('Tool/toolData:', tool || toolData);
+        
         if (!currentSelection || !suggestionTextarea.value.trim()) {
             showNotification('Please select text and enter a suggestion');
             return;
         }
         
-        await saveSuggestion(tool || toolData, currentSelection, suggestionTextarea.value.trim());
-        overlay.remove();
-        showNotification('Suggestion saved successfully');
+        try {
+            await saveSuggestion(tool || toolData, currentSelection, suggestionTextarea.value.trim());
+            console.log('RC Tool Commenter: Suggestion saved successfully');
+            overlay.remove();
+            showNotification('Suggestion saved successfully');
+            
+            // Debug: Check if suggestion was actually stored
+            const bodyElement = document.body;
+            const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
+            const weaveId = bodyElement.dataset.weave || extractFromUrl('weave') || 'unknown';
+            const storageKey = `rc_suggestions_${expositionId}_${weaveId}`;
+            const result = await browser.storage.local.get(storageKey);
+            console.log('RC Tool Commenter: Suggestions in storage after save:', result[storageKey]);
+            
+        } catch (error) {
+            console.error('RC Tool Commenter: Error saving suggestion:', error);
+            showNotification('Error saving suggestion');
+        }
     });
     
     // Cancel suggestion
@@ -1158,6 +1331,13 @@ async function saveSuggestion(toolOrData, selection, suggestionText) {
     const expositionResult = await browser.storage.local.get(expositionStorageKey);
     if (expositionResult[expositionStorageKey]) {
         await updateSaveButtonCount(expositionResult[expositionStorageKey]);
+    }
+    
+    // Re-store tools to update suggestion counts in export data
+    const allTextTools = document.querySelectorAll('.tool-text, .tool-simpletext');
+    if (allTextTools.length > 0) {
+        console.log('RC Tool Commenter: Re-storing tools with updated suggestion data');
+        await storeToolsInMemory(Array.from(allTextTools));
     }
     
     // If we're in text-only view, update the suggestion badge for this tool
@@ -1313,6 +1493,15 @@ async function enhanceTools() {
     // Store found tools in memory for cross-weave collection
     if (tools.length > 0) {
         await storeToolsInMemory(tools);
+        toolsStoredForCurrentWeave = true;
+    } else if (!toolsStoredForCurrentWeave) {
+        // Only collect existing tools once per weave if no tools to enhance
+        console.log('RC Tool Commenter: No tools to enhance, but collecting existing tools for suggestion data (one time)');
+        const allTextTools = document.querySelectorAll('.tool-text, .tool-simpletext');
+        if (allTextTools.length > 0) {
+            await storeToolsInMemory(Array.from(allTextTools));
+            toolsStoredForCurrentWeave = true;
+        }
     }
     
     // Restore suggestion badges for tools that have suggestions
@@ -1650,6 +1839,9 @@ async function initializeExtension() {
     }
     
     console.log('RC Tool Commenter: Initializing on exposition page');
+    
+    // Reset storage flag for new weave
+    toolsStoredForCurrentWeave = false;
     
     // Cache CLEAN page content BEFORE any enhancements (only once)
     if (!isTextOnlyView && !originalPageContent) {
