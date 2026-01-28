@@ -782,6 +782,7 @@ function addSuggestionBadge(tool, count) {
         const badge = document.createElement('div');
         badge.className = 'rc-suggestion-count';
         badge.textContent = count;
+        badge.title = `Click to view ${count} suggestion${count > 1 ? 's' : ''}`;
         badge.style.cssText = `
             position: absolute;
             top: -8px;
@@ -798,9 +799,192 @@ function addSuggestionBadge(tool, count) {
             justify-content: center;
             z-index: 10;
             box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: transform 0.2s ease-in-out;
         `;
         
+        // Add hover effect
+        badge.addEventListener('mouseenter', () => {
+            badge.style.transform = 'scale(1.1)';
+        });
+        
+        badge.addEventListener('mouseleave', () => {
+            badge.style.transform = 'scale(1)';
+        });
+        
+        // Add click handler to show suggestions
+        badge.addEventListener('click', async (event) => {
+            event.stopPropagation();
+            event.preventDefault();
+            await showToolSuggestions(tool);
+        });
+        
         tool.appendChild(badge);
+    }
+}
+
+// Function to show existing suggestions for a tool
+async function showToolSuggestions(tool) {
+    const bodyElement = document.body;
+    const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
+    const toolId = tool.dataset.id || 'unknown';
+    
+    // Get suggestions for this tool
+    const storageKey = `rc_suggestions_${expositionId}`;
+    const result = await browser.storage.local.get(storageKey);
+    const suggestions = result[storageKey] || [];
+    
+    const toolSuggestions = suggestions.filter(s => s.toolId === toolId);
+    
+    if (toolSuggestions.length === 0) {
+        showNotification('No suggestions found for this tool');
+        return;
+    }
+    
+    // Remove any existing suggestion viewer
+    const existingViewer = document.getElementById('rc-suggestion-viewer');
+    if (existingViewer) {
+        existingViewer.remove();
+    }
+    
+    // Create suggestion viewer overlay
+    const viewer = document.createElement('div');
+    viewer.id = 'rc-suggestion-viewer';
+    viewer.className = 'rc-suggestion-viewer';
+    
+    // Sort suggestions by timestamp (newest first)
+    const sortedSuggestions = toolSuggestions.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    
+    viewer.innerHTML = `
+        <div class="rc-suggestion-viewer-header">
+            <h3>Suggestions for Tool ${toolId}</h3>
+            <button class="rc-close-viewer" title="Close">×</button>
+        </div>
+        <div class="rc-suggestion-viewer-content">
+            <div class="rc-suggestions-list">
+                ${sortedSuggestions.map((suggestion, index) => `
+                    <div class="rc-suggestion-item">
+                        <div class="rc-suggestion-meta">
+                            <span class="rc-suggestion-number">#${index + 1}</span>
+                            <span class="rc-suggestion-date">${formatDate(suggestion.timestamp)}</span>
+                            <span class="rc-suggestion-weave">Weave ${suggestion.weaveId}</span>
+                        </div>
+                        <div class="rc-suggestion-selected-text">
+                            <label>Selected text:</label>
+                            <div class="rc-selected-text-display">"${suggestion.selectedText}"</div>
+                        </div>
+                        <div class="rc-suggestion-content">
+                            <label>Suggestion:</label>
+                            <div class="rc-suggestion-text">${suggestion.suggestion}</div>
+                        </div>
+                        <div class="rc-suggestion-actions">
+                            <button class="rc-delete-suggestion" data-suggestion-id="${suggestion.id}" title="Delete this suggestion">
+                                <svg width="14" height="14" viewBox="0 0 16 16">
+                                    <path fill="currentColor" d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                                    <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                                </svg>
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+    
+    // Position and style the viewer
+    viewer.style.cssText = `
+        position: fixed;
+        top: 50px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 600px;
+        max-width: 90vw;
+        max-height: 80vh;
+        background: white;
+        border: 2px solid #dc3545;
+        border-radius: 8px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+        z-index: 10001;
+        overflow-y: auto;
+    `;
+    
+    document.body.appendChild(viewer);
+    
+    // Set up event handlers
+    setupSuggestionViewerHandlers(viewer, tool);
+}
+
+// Function to format date for display
+function formatDate(timestamp) {
+    const date = new Date(timestamp);
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+}
+
+// Function to set up suggestion viewer event handlers
+function setupSuggestionViewerHandlers(viewer, tool) {
+    const closeBtn = viewer.querySelector('.rc-close-viewer');
+    const deleteButtons = viewer.querySelectorAll('.rc-delete-suggestion');
+    
+    // Close button
+    closeBtn.addEventListener('click', () => {
+        viewer.remove();
+    });
+    
+    // Delete suggestion buttons
+    deleteButtons.forEach(button => {
+        button.addEventListener('click', async () => {
+            const suggestionId = button.dataset.suggestionId;
+            const confirmed = confirm('Are you sure you want to delete this suggestion?');
+            
+            if (confirmed) {
+                await deleteSuggestion(suggestionId, tool);
+                viewer.remove();
+                showNotification('Suggestion deleted');
+            }
+        });
+    });
+    
+    // Close on escape key
+    document.addEventListener('keydown', function escapeHandler(e) {
+        if (e.key === 'Escape') {
+            viewer.remove();
+            document.removeEventListener('keydown', escapeHandler);
+        }
+    });
+    
+    // Close when clicking outside
+    viewer.addEventListener('click', (e) => {
+        if (e.target === viewer) {
+            viewer.remove();
+        }
+    });
+}
+
+// Function to delete a suggestion
+async function deleteSuggestion(suggestionId, tool) {
+    const bodyElement = document.body;
+    const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
+    
+    // Get current suggestions
+    const storageKey = `rc_suggestions_${expositionId}`;
+    const result = await browser.storage.local.get(storageKey);
+    let suggestions = result[storageKey] || [];
+    
+    // Remove the suggestion
+    suggestions = suggestions.filter(s => s.id !== suggestionId);
+    
+    // Save updated suggestions
+    await browser.storage.local.set({ [storageKey]: suggestions });
+    
+    // Update tool badge
+    await updateToolWithSuggestionCount(tool);
+    
+    // Update save button
+    const expositionStorageKey = `rc_exposition_${expositionId}`;
+    const expositionResult = await browser.storage.local.get(expositionStorageKey);
+    if (expositionResult[expositionStorageKey]) {
+        await updateSaveButtonCount(expositionResult[expositionStorageKey]);
     }
 }
 
