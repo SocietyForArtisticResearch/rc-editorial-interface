@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#007bff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0056b3;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="64" cy="64" r="60" fill="url(#grad)" stroke="#fff" stroke-width="4"/>
+  
+  <!-- Tool/comment icon -->
+  <g transform="translate(64,64)">
+    <!-- Speech bubble -->
+    <path d="M-20,-15 L15,-15 Q20,-15 20,-10 L20,5 Q20,10 15,10 L-5,10 L-15,20 L-10,10 L-20,10 Q-25,10 -25,5 L-25,-10 Q-25,-15 -20,-15 Z" 
+          fill="white" stroke="none"/>
+    
+    <!-- Tool/cursor icon inside bubble -->
+    <circle cx="-5" cy="-2" r="2" fill="#007bff"/>
+    <circle cx="5" cy="-2" r="2" fill="#007bff"/>
+    <circle cx="0" cy="5" r="2" fill="#007bff"/>
+    
+    <!-- Connection lines -->
+    <line x1="-5" y1="-2" x2="0" y2="5" stroke="#007bff" stroke-width="1"/>
+    <line x1="5" y1="-2" x2="0" y2="5" stroke="#007bff" stroke-width="1"/>
+  </g>
+  
+  <!-- Small RC logo reference -->
+  <text x="64" y="100" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="white">RC</text>
+</svg>

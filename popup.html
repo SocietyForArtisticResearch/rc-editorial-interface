@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {
+            width: 300px;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .logo {
+            font-size: 18px;
+            font-weight: bold;
+            color: #007bff;
+            margin-bottom: 5px;
+        }
+        
+        .description {
+            color: #666;
+            font-size: 12px;
+        }
+        
+        .status {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 15px 0;
+        }
+        
+        .status-active {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        
+        .status-inactive {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        
+        .instructions {
+            margin-top: 15px;
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .instructions h4 {
+            margin: 10px 0 5px 0;
+            color: #333;
+        }
+        
+        .instructions ul {
+            margin: 5px 0;
+            padding-left: 20px;
+        }
+        
+        .instructions li {
+            margin: 3px 0;
+        }
+        
+        .button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+        }
+        
+        .button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">RC Tool Commenter</div>
+        <div class="description">Research Catalogue Tool Interaction</div>
+    </div>
+    
+    <div id="status" class="status">
+        <div id="status-text">Checking status...</div>
+    </div>
+    
+    <div class="instructions">
+        <h4>How to use:</h4>
+        <ul>
+            <li>Navigate to a Research Catalogue exposition</li>
+            <li>Tools will be highlighted with blue dashed outlines</li>
+            <li>Click on any tool to see its name</li>
+            <li>Tool names will appear in a tooltip</li>
+        </ul>
+        
+        <h4>Supported sites:</h4>
+        <ul>
+            <li>*.researchcatalogue.net</li>
+        </ul>
+    </div>
+    
+    <button id="openRC" class="button">Open Research Catalogue</button>
+    
+    <script src="popup.js"></script>
+</body>
+</html>

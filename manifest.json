@@ -1,0 +1,36 @@
+{
+  "manifest_version": 2,
+  "name": "Research Catalogue Tool Commenter",
+  "version": "1.0",
+  "description": "Click on tools in Research Catalogue expositions to view tool names and leave comments",
+
+  "permissions": [
+    "activeTab",
+    "storage",
+    "*://*.researchcatalogue.net/*"
+  ],
+
+  "content_scripts": [
+    {
+      "matches": ["*://*.researchcatalogue.net/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"]
+    }
+  ],
+
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": false
+  },
+
+  "browser_action": {
+    "default_title": "RC Tool Commenter",
+    "default_popup": "popup.html"
+  },
+
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  }
+}
