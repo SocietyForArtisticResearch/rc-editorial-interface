@@ -181,10 +181,22 @@ async function updateSaveButtonCount(expositionData) {
     const bodyElement = document.body;
     const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
     
-    // Get suggestion count
-    const suggestionsKey = `rc_suggestions_${expositionId}`;
-    const suggestionsResult = await browser.storage.local.get(suggestionsKey);
-    const suggestions = suggestionsResult[suggestionsKey] || [];
+    // Count suggestions across all weaves
+    let totalSuggestions = 0;
+    
+    // Get suggestions for each weave and count them
+    for (const weaveId of Object.keys(expositionData.weaves)) {
+        const suggestionsKey = `rc_suggestions_${expositionId}_${weaveId}`;
+        const suggestionsResult = await browser.storage.local.get(suggestionsKey);
+        const weavesSuggestions = suggestionsResult[suggestionsKey] || {};
+        
+        // Count suggestions for each tool in this weave
+        Object.values(weavesSuggestions).forEach(toolSuggestions => {
+            if (Array.isArray(toolSuggestions)) {
+                totalSuggestions += toolSuggestions.length;
+            }
+        });
+    }
     
     let totalTools = 0;
     let weaveCount = 0;
@@ -199,7 +211,7 @@ async function updateSaveButtonCount(expositionData) {
         <svg width="16" height="16" viewBox="0 0 16 16" style="margin-right: 6px;">
             <path fill="currentColor" d="M13 0H3a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V3a3 3 0 0 0-3-3zM8 1.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zM11 14.5H5a.5.5 0 0 1 0-1h6a.5.5 0 0 1 0 1z"/>
         </svg>
-        Save ${totalTools} Tools, ${suggestions.length} Suggestions (${weaveCount} weaves)
+        Save ${totalTools} Tools, ${totalSuggestions} Suggestions (${weaveCount} weaves)
     `;
 }
 
@@ -227,7 +239,34 @@ function createSaveButton() {
         saveAllToolsAsJSON();
     });
     
+    // Create import button
+    const importButton = document.createElement('button');
+    importButton.id = 'rc-import-tools-btn';
+    importButton.className = 'rc-import-button';
+    importButton.innerHTML = `
+        <span>
+            <svg width="16" height="16" viewBox="0 0 16 16" style="margin-right: 6px;">
+                <path fill="currentColor" d="M8.5 1.5A2.5 2.5 0 0 1 11 4v4.793l1.146-1.147a.5.5 0 0 1 .708.708L10.5 10.707a.5.5 0 0 1-.708 0L7.439 8.354a.5.5 0 1 1 .708-.708L9.5 8.793V4A1.5 1.5 0 0 0 8 2.5H3A1.5 1.5 0 0 0 1.5 4v8A1.5 1.5 0 0 0 3 13.5h5a.5.5 0 0 1 0 1H3A2.5 2.5 0 0 1 .5 12V4A2.5 2.5 0 0 1 3 1.5h5.5z"/>
+            </svg>
+            Import JSON
+        </span>
+    `;
+    importButton.title = 'Import suggestions from JSON file';
+    
+    // Create hidden file input for import
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.json';
+    fileInput.style.display = 'none';
+    fileInput.id = 'rc-file-input';
+    
+    // Add click handlers
+    importButton.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', handleImportFile);
+
     document.body.appendChild(saveButton);
+    document.body.appendChild(importButton);
+    document.body.appendChild(fileInput);
 }
 
 // Function to save all tools from all visited weaves as JSON
@@ -322,6 +361,220 @@ async function saveAllToolsAsJSON() {
 // Function to save tools as JSON (legacy - keeping for backwards compatibility)
 function saveToolsAsJSON() {
     saveAllToolsAsJSON();
+}
+
+// Function to handle importing JSON file
+async function handleImportFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    try {
+        const text = await file.text();
+        const importData = JSON.parse(text);
+        
+        // Validate the imported data structure
+        if (!importData.exposition?.id || !importData.weaves) {
+            throw new Error('Invalid JSON structure. Expected exposition data with weaves.');
+        }
+        
+        // Extract exposition ID from the correct location
+        const importedExpositionId = importData.exposition.id;
+        
+        // Get current exposition ID
+        const bodyElement = document.body;
+        const currentExpositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
+        
+        // Check if the imported data matches current exposition
+        if (importedExpositionId !== currentExpositionId) {
+            const confirmImport = confirm(
+                `The imported data is for exposition ${importedExpositionId}, but you're currently viewing exposition ${currentExpositionId}. ` +
+                'Do you want to import anyway? This will merge the suggestions with current data.'
+            );
+            if (!confirmImport) {
+                event.target.value = ''; // Reset file input
+                return;
+            }
+        }
+        
+        // Import the data
+        await importSuggestionData(importData, currentExpositionId);
+        
+        // Update save button count to reflect imported suggestions
+        const expositionStorageKey = `rc_exposition_${currentExpositionId}`;
+        const expositionResult = await browser.storage.local.get(expositionStorageKey);
+        if (expositionResult[expositionStorageKey]) {
+            await updateSaveButtonCount(expositionResult[expositionStorageKey]);
+        }
+        
+        // Show success message
+        showImportStatus('Success! Suggestions imported successfully.', 'success');
+        
+        // Refresh the current page view to show imported suggestions
+        setTimeout(async () => {
+            // Clear existing tool enhancements to allow re-processing
+            const existingTools = document.querySelectorAll('[data-rc-tool-enhanced]');
+            existingTools.forEach(tool => {
+                tool.removeAttribute('data-rc-tool-enhanced');
+                // Remove existing badges and styling
+                const badge = tool.querySelector('.rc-suggestion-count');
+                if (badge) badge.remove();
+                tool.style.cursor = '';
+                tool.style.outline = '';
+                tool.style.outlineOffset = '';
+            });
+            
+            // Remove existing buttons to avoid duplicates
+            const existingSaveBtn = document.getElementById('rc-save-tools-btn');
+            if (existingSaveBtn) existingSaveBtn.remove();
+            const existingImportBtn = document.getElementById('rc-import-tools-btn');
+            if (existingImportBtn) existingImportBtn.remove();
+            const existingFileInput = document.getElementById('rc-file-input');
+            if (existingFileInput) existingFileInput.remove();
+            
+            // Re-initialize the extension
+            await initializeExtension();
+        }, 300);
+        
+    } catch (error) {
+        console.error('Error importing JSON:', error);
+        showImportStatus('Error importing file: ' + error.message, 'error');
+    }
+    
+    // Reset file input
+    event.target.value = '';
+}
+
+// Function to import suggestion data into storage
+async function importSuggestionData(importData, targetExpositionId) {
+    const storageKey = `rc_exposition_${targetExpositionId}`;
+    
+    // Get existing data for this exposition
+    const existingResult = await browser.storage.local.get(storageKey);
+    const existingData = existingResult[storageKey] || { weaves: {} };
+    
+    // Merge imported weaves with existing data
+    for (const [weaveId, weaveData] of Object.entries(importData.weaves)) {
+        if (!existingData.weaves[weaveId]) {
+            existingData.weaves[weaveId] = {
+                tools: [],
+                url: weaveData.url,
+                pageTitle: weaveData.pageTitle,
+                visitedAt: weaveData.lastVisited || weaveData.visitedAt // Handle both formats
+            };
+        }
+        
+        // Merge tools and suggestions
+        for (const importedTool of weaveData.tools) {
+            const existingToolIndex = existingData.weaves[weaveId].tools.findIndex(
+                tool => tool.toolId === importedTool.id || tool.id === importedTool.id
+            );
+            
+            if (existingToolIndex >= 0) {
+                // Update existing tool with imported suggestions
+                const existingTool = existingData.weaves[weaveId].tools[existingToolIndex];
+                
+                // Merge suggestions, avoiding duplicates based on content and selected text
+                if (importedTool.suggestions && importedTool.suggestions.length > 0) {
+                    if (!existingTool.suggestions) {
+                        existingTool.suggestions = [];
+                    }
+                    
+                    for (const importedSuggestion of importedTool.suggestions) {
+                        const isDuplicate = existingTool.suggestions.some(existing => 
+                            existing.selectedText === importedSuggestion.selectedText &&
+                            existing.suggestionText === importedSuggestion.suggestionText
+                        );
+                        
+                        if (!isDuplicate) {
+                            // Assign new ID to avoid conflicts
+                            const newSuggestion = {
+                                ...importedSuggestion,
+                                id: Date.now() + Math.random(),
+                                importedAt: new Date().toISOString()
+                            };
+                            existingTool.suggestions.push(newSuggestion);
+                        }
+                    }
+                }
+            } else {
+                // Add new tool with its suggestions
+                const newTool = { ...importedTool };
+                if (newTool.suggestions) {
+                    // Assign new IDs to suggestions to avoid conflicts
+                    newTool.suggestions = newTool.suggestions.map(suggestion => ({
+                        ...suggestion,
+                        id: Date.now() + Math.random(),
+                        importedAt: new Date().toISOString()
+                    }));
+                }
+                existingData.weaves[weaveId].tools.push(newTool);
+            }
+        }
+    }
+    
+    // Save merged data back to storage
+    await browser.storage.local.set({ [storageKey]: existingData });
+    
+    // Import suggestions for ALL weaves in the exposition
+    for (const [weaveId, weaveData] of Object.entries(importData.weaves)) {
+        if (weaveData.tools) {
+            const suggestionsKey = `rc_suggestions_${targetExpositionId}_${weaveId}`;
+            const existingSuggestions = await browser.storage.local.get(suggestionsKey);
+            const suggestions = existingSuggestions[suggestionsKey] || {};
+            
+            // Import suggestions for each tool in this weave
+            for (const tool of weaveData.tools) {
+                if (tool.suggestions && tool.suggestions.length > 0) {
+                    const toolKey = tool.id || tool.toolId; // Handle both id formats
+                    if (!suggestions[toolKey]) {
+                        suggestions[toolKey] = [];
+                    }
+                    
+                    // Add imported suggestions with new IDs
+                    for (const suggestion of tool.suggestions) {
+                        const isDuplicate = suggestions[toolKey].some(existing => 
+                            existing.selectedText === suggestion.selectedText &&
+                            existing.suggestionText === suggestion.suggestionText
+                        );
+                        
+                        if (!isDuplicate) {
+                            suggestions[toolKey].push({
+                                ...suggestion,
+                                id: Date.now() + Math.random(),
+                                importedAt: new Date().toISOString()
+                            });
+                        }
+                    }
+                }
+            }
+            
+            // Save suggestions for this weave
+            await browser.storage.local.set({ [suggestionsKey]: suggestions });
+        }
+    }
+}
+
+// Function to show import status messages
+function showImportStatus(message, type = 'info') {
+    // Remove any existing status message
+    const existingStatus = document.getElementById('rc-import-status');
+    if (existingStatus) {
+        existingStatus.remove();
+    }
+    
+    const statusDiv = document.createElement('div');
+    statusDiv.id = 'rc-import-status';
+    statusDiv.className = `rc-import-status rc-import-${type}`;
+    statusDiv.textContent = message;
+    
+    document.body.appendChild(statusDiv);
+    
+    // Remove status message after 4 seconds
+    setTimeout(() => {
+        if (statusDiv.parentNode) {
+            statusDiv.remove();
+        }
+    }, 4000);
 }
 
 // Function to create text suggestion interface
@@ -550,14 +803,15 @@ async function saveSuggestion(tool, selection, suggestionText) {
 async function updateToolWithSuggestionCount(tool) {
     const bodyElement = document.body;
     const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
+    const weaveId = extractFromUrl('weave') || bodyElement.dataset.weave || 'unknown';
     const toolId = tool.dataset.id || 'unknown';
     
-    // Get suggestions for this tool
-    const storageKey = `rc_suggestions_${expositionId}`;
+    // Get suggestions for this tool in the current weave
+    const storageKey = `rc_suggestions_${expositionId}_${weaveId}`;
     const result = await browser.storage.local.get(storageKey);
-    const suggestions = result[storageKey] || [];
+    const suggestions = result[storageKey] || {};
     
-    const toolSuggestions = suggestions.filter(s => s.toolId === toolId);
+    const toolSuggestions = suggestions[toolId] || [];
     
     // Use the centralized badge function
     addSuggestionBadge(tool, toolSuggestions.length);
@@ -745,26 +999,18 @@ async function enhanceTools() {
 async function restoreSuggestionBadges(tools) {
     const bodyElement = document.body;
     const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
+    const weaveId = extractFromUrl('weave') || bodyElement.dataset.weave || 'unknown';
     
-    // Get all suggestions for this exposition
-    const storageKey = `rc_suggestions_${expositionId}`;
+    // Get suggestions for this exposition and weave
+    const storageKey = `rc_suggestions_${expositionId}_${weaveId}`;
     const result = await browser.storage.local.get(storageKey);
-    const suggestions = result[storageKey] || [];
-    
-    // Group suggestions by tool ID
-    const suggestionsByTool = {};
-    suggestions.forEach(suggestion => {
-        if (!suggestionsByTool[suggestion.toolId]) {
-            suggestionsByTool[suggestion.toolId] = [];
-        }
-        suggestionsByTool[suggestion.toolId].push(suggestion);
-    });
+    const suggestions = result[storageKey] || {};
     
     // Add badges to tools that have suggestions
     tools.forEach(tool => {
         const toolId = tool.dataset.id;
-        if (toolId && suggestionsByTool[toolId]) {
-            const suggestionCount = suggestionsByTool[toolId].length;
+        if (toolId && suggestions[toolId] && suggestions[toolId].length > 0) {
+            const suggestionCount = suggestions[toolId].length;
             addSuggestionBadge(tool, suggestionCount);
         }
     });
@@ -827,14 +1073,15 @@ function addSuggestionBadge(tool, count) {
 async function showToolSuggestions(tool) {
     const bodyElement = document.body;
     const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
+    const weaveId = extractFromUrl('weave') || bodyElement.dataset.weave || 'unknown';
     const toolId = tool.dataset.id || 'unknown';
     
-    // Get suggestions for this tool
-    const storageKey = `rc_suggestions_${expositionId}`;
+    // Get suggestions for this tool in the current weave
+    const storageKey = `rc_suggestions_${expositionId}_${weaveId}`;
     const result = await browser.storage.local.get(storageKey);
-    const suggestions = result[storageKey] || [];
+    const suggestions = result[storageKey] || {};
     
-    const toolSuggestions = suggestions.filter(s => s.toolId === toolId);
+    const toolSuggestions = suggestions[toolId] || [];
     
     if (toolSuggestions.length === 0) {
         showNotification('No suggestions found for this tool');
