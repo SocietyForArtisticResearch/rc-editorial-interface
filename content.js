@@ -1478,7 +1478,189 @@ function showToolName(toolName, x, y) {
     }, 3000);
 }
 
-// Function to enhance tools with click handlers
+// Function to set up global suggestion interface for all text tools
+function setupGlobalSuggestionInterface() {
+    console.log('RC Tool Commenter: Setting up global suggestion interface');
+    
+    // Create the suggestion editor (hidden initially)
+    const suggestionEditor = document.createElement('div');
+    suggestionEditor.id = 'rc-global-suggestion-editor';
+    suggestionEditor.style.cssText = `
+        position: fixed;
+        top: 50px;
+        right: 20px;
+        width: 350px;
+        background: white;
+        border: 2px solid #007bff;
+        border-radius: 8px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+        z-index: 10000;
+        padding: 15px;
+        display: none;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    `;
+    
+    suggestionEditor.innerHTML = `
+        <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+            <h3 style="margin: 0; font-size: 16px; color: #333; flex: 1;">Suggest Edit</h3>
+            <button class="rc-close-suggestion" style="background: none; border: none; font-size: 20px; color: #666; cursor: pointer; padding: 0; margin: 0;">&times;</button>
+        </div>
+        
+        <div class="rc-selected-text-display" style="margin-bottom: 15px;">
+            <div style="font-size: 12px; font-weight: bold; margin-bottom: 5px; color: #555;">Selected text:</div>
+            <div class="rc-selected-text" style="background: #fff3cd; padding: 8px; border-radius: 4px; font-size: 13px; line-height: 1.4; max-height: 80px; overflow-y: auto; border: 1px solid #ffeaa7;"></div>
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+            <div style="font-size: 12px; font-weight: bold; margin-bottom: 5px; color: #555;">Your suggestion:</div>
+            <textarea class="rc-suggestion-input" placeholder="Enter your suggestion here..." style="width: 100%; height: 80px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; resize: vertical; font-size: 13px; font-family: inherit;"></textarea>
+        </div>
+        
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+            <button class="rc-cancel-suggestion" style="padding: 8px 16px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">Cancel</button>
+            <button class="rc-save-suggestion" style="padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">Save</button>
+        </div>
+    `;
+    
+    document.body.appendChild(suggestionEditor);
+    
+    // Get editor elements
+    const selectedTextDisplay = suggestionEditor.querySelector('.rc-selected-text');
+    const suggestionInput = suggestionEditor.querySelector('.rc-suggestion-input');
+    const closeBtn = suggestionEditor.querySelector('.rc-close-suggestion');
+    const saveBtn = suggestionEditor.querySelector('.rc-save-suggestion');
+    const cancelBtn = suggestionEditor.querySelector('.rc-cancel-suggestion');
+    
+    let currentSelection = null;
+    let currentTool = null;
+    
+    // Global mouse up handler for text selection across all tools
+    const globalMouseUpHandler = (e) => {
+        setTimeout(() => {
+            const selection = window.getSelection();
+            const selectedText = selection.toString().trim();
+            
+            if (selectedText.length > 0 && selection.rangeCount > 0) {
+                const range = selection.getRangeAt(0);
+                
+                // Find which tool this selection belongs to
+                const allTextTools = document.querySelectorAll('.tool-text, .tool-simpletext');
+                let targetTool = null;
+                
+                for (const tool of allTextTools) {
+                    const textEditorContent = tool.querySelector('.html-text-editor-content');
+                    if (textEditorContent && (
+                        textEditorContent.contains(range.commonAncestorContainer) || 
+                        textEditorContent.contains(range.startContainer) || 
+                        textEditorContent.contains(range.endContainer) ||
+                        range.commonAncestorContainer === textEditorContent ||
+                        range.startContainer.parentNode === textEditorContent ||
+                        range.endContainer.parentNode === textEditorContent
+                    )) {
+                        targetTool = tool;
+                        break;
+                    }
+                }
+                
+                if (targetTool) {
+                    console.log('RC Tool Commenter: Text selected in tool:', targetTool.dataset.id);
+                    
+                    currentTool = targetTool;
+                    currentSelection = {
+                        text: selectedText,
+                        range: range.cloneRange(),
+                        startOffset: range.startOffset,
+                        endOffset: range.endOffset,
+                        startContainer: range.startContainer,
+                        endContainer: range.endContainer
+                    };
+                    
+                    // Show the suggestion editor
+                    selectedTextDisplay.textContent = selectedText;
+                    suggestionInput.value = '';
+                    suggestionEditor.style.display = 'block';
+                    suggestionInput.focus();
+                    
+                    console.log('RC Tool Commenter: Global suggestion editor shown for tool:', currentTool.dataset.id);
+                }
+            } else {
+                // Only hide editor if we're not clicking on it
+                if (!suggestionEditor.contains(e.target)) {
+                    suggestionEditor.style.display = 'none';
+                    currentSelection = null;
+                    currentTool = null;
+                }
+            }
+        }, 50);
+    };
+    
+    // Close button handler
+    closeBtn.addEventListener('click', () => {
+        suggestionEditor.style.display = 'none';
+        currentSelection = null;
+        currentTool = null;
+    });
+    
+    // Cancel button handler
+    cancelBtn.addEventListener('click', () => {
+        suggestionEditor.style.display = 'none';
+        currentSelection = null;
+        currentTool = null;
+    });
+    
+    // Save button handler
+    saveBtn.addEventListener('click', async () => {
+        if (!currentSelection || !currentTool) {
+            showNotification('Please select text and enter a suggestion');
+            return;
+        }
+        
+        const suggestionText = suggestionInput.value.trim();
+        if (!suggestionText) {
+            showNotification('Please enter a suggestion');
+            return;
+        }
+        
+        try {
+            console.log('RC Tool Commenter: Saving suggestion for tool:', currentTool.dataset.id);
+            await saveSuggestion(currentTool, currentSelection, suggestionText);
+            
+            showNotification('Suggestion saved successfully');
+            
+            // Hide the editor
+            suggestionEditor.style.display = 'none';
+            currentSelection = null;
+            currentTool = null;
+            
+            // Re-store tools with updated suggestion data
+            const allTextTools = document.querySelectorAll('.tool-text, .tool-simpletext');
+            if (allTextTools.length > 0) {
+                console.log('RC Tool Commenter: Re-storing tools with updated suggestion data');
+                await storeToolsInMemory(Array.from(allTextTools));
+            }
+        } catch (error) {
+            console.error('RC Tool Commenter: Error saving suggestion:', error);
+            showNotification('Error saving suggestion');
+        }
+    });
+    
+    // Escape key handler
+    const escapeHandler = (e) => {
+        if (e.key === 'Escape') {
+            suggestionEditor.style.display = 'none';
+            currentSelection = null;
+            currentTool = null;
+        }
+    };
+    
+    // Add global event listeners
+    document.addEventListener('mouseup', globalMouseUpHandler);
+    document.addEventListener('keydown', escapeHandler);
+    
+    console.log('RC Tool Commenter: Global suggestion interface setup complete');
+}
+
+// Function to enhance text tools with permanent blue borders and global suggestion capability
 async function enhanceTools() {
     // Skip tool enhancement if we're in text-only view
     if (isTextOnlyView) {
@@ -1507,81 +1689,61 @@ async function enhanceTools() {
     // Restore suggestion badges for tools that have suggestions
     await restoreSuggestionBadges(tools);
     
+    // Set up global suggestion interface (only once)
+    if (!window.rcGlobalSuggestionSetup) {
+        setupGlobalSuggestionInterface();
+        window.rcGlobalSuggestionSetup = true;
+    }
+    
     tools.forEach((tool, index) => {
         // Mark as enhanced to avoid duplicate processing
         tool.setAttribute('data-rc-tool-enhanced', 'true');
         
-        // Add visual indicator (more subtle for RC interface)
-        tool.style.cursor = 'pointer';
-        tool.style.outline = '1px dashed rgba(0, 123, 255, 0.4)';
-        tool.style.outlineOffset = '1px';
-        tool.style.transition = 'outline 0.2s ease-in-out';
+        const toolType = tool.dataset.tool;
         
-        // Add a subtle overlay to indicate interactivity
-        const overlay = document.createElement('div');
-        overlay.className = 'rc-tool-overlay';
-        overlay.style.cssText = `
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 123, 255, 0.05);
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.2s ease-in-out;
-            z-index: 1;
-        `;
-        
-        // Insert overlay as first child to ensure it doesn't interfere with content
-        if (tool.style.position !== 'absolute' && tool.style.position !== 'relative') {
-            tool.style.position = 'relative';
-        }
-        tool.insertBefore(overlay, tool.firstChild);
-        
-        // Add click handler
-        tool.addEventListener('click', (event) => {
-            // If Cmd key is pressed, allow normal interaction (don't prevent default)
-            if (event.metaKey) {
-                console.log('RC Tool Commenter: Cmd+click detected, allowing normal interaction');
-                return; // Let the event bubble normally
+        // For text tools, add permanent blue borders and enable text selection
+        if (toolType === 'text' || toolType === 'simpletext') {
+            const toolContent = tool.querySelector('.tool-content');
+            if (toolContent) {
+                toolContent.style.border = '2px solid #007bff';
+                toolContent.style.borderRadius = '4px';
+                toolContent.style.transition = 'border 0.2s ease';
             }
             
-            event.preventDefault();
-            event.stopPropagation();
+            // Enable text selection for text editor content
+            const textEditorContent = tool.querySelector('.html-text-editor-content');
+            if (textEditorContent) {
+                textEditorContent.style.userSelect = 'text';
+            }
+        } else {
+            // For non-text tools, keep the old click behavior for showing tool names
+            tool.style.cursor = 'pointer';
+            tool.style.outline = '1px dashed rgba(0, 123, 255, 0.4)';
+            tool.style.outlineOffset = '1px';
+            tool.style.transition = 'outline 0.2s ease-in-out';
             
-            const toolType = tool.dataset.tool;
-            
-            // For text tools, open suggestion interface
-            if (toolType === 'text' || toolType === 'simpletext') {
-                createTextSuggestionInterface(tool, event.clientX, event.clientY);
-            } else {
-                // For other tools, show tooltip as before
+            // Add click handler for non-text tools
+            tool.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                
                 const toolName = getToolName(tool);
                 const x = event.clientX;
                 const y = event.clientY - 40;
                 
                 console.log(`RC Tool Commenter: Clicked on tool "${toolName}"`);
                 showToolName(toolName, x, y);
-            }
-        });
-        
-        // Add hover effect
-        tool.addEventListener('mouseenter', () => {
-            tool.style.outline = '1px solid rgba(0, 123, 255, 0.8)';
-            const overlay = tool.querySelector('.rc-tool-overlay');
-            if (overlay) {
-                overlay.style.opacity = '1';
-            }
-        });
-        
-        tool.addEventListener('mouseleave', () => {
-            tool.style.outline = '1px dashed rgba(0, 123, 255, 0.4)';
-            const overlay = tool.querySelector('.rc-tool-overlay');
-            if (overlay) {
-                overlay.style.opacity = '0';
-            }
-        });
+            });
+            
+            // Add hover effect for non-text tools
+            tool.addEventListener('mouseenter', () => {
+                tool.style.outline = '1px solid rgba(0, 123, 255, 0.8)';
+            });
+            
+            tool.addEventListener('mouseleave', () => {
+                tool.style.outline = '1px dashed rgba(0, 123, 255, 0.4)';
+            });
+        }
     });
 }
 
