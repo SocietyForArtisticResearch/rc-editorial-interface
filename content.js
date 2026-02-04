@@ -1345,11 +1345,17 @@ async function saveSuggestion(toolOrData, selection, suggestionText) {
             span.className = 'rc-suggestion-highlight';
             span.style.cssText = 'background-color: rgba(255, 235, 59, 0.3); border-bottom: 2px solid #FFC107;';
             
+            // Store suggestion data directly in the span
+            span.setAttribute('data-suggestion', suggestionText);
+            span.setAttribute('data-selected-text', selection.text);
+            
             // Add click handler to show suggestion
             span.addEventListener('click', function(e) {
                 e.preventDefault();
                 e.stopPropagation();
-                showSuggestionTooltip(this, suggestionText, selection.text);
+                const suggestion = this.getAttribute('data-suggestion');
+                const selectedText = this.getAttribute('data-selected-text');
+                showSuggestionTooltip(this, suggestion, selectedText);
             });
             
             // Wrap the selected content
@@ -1460,7 +1466,29 @@ async function addClickHandlersToRestoredSpans(textContent, toolId) {
     const spans = textContent.querySelectorAll('.rc-suggestion-highlight');
     if (spans.length === 0) return;
     
-    // Get suggestion data for this tool
+    spans.forEach(span => {
+        // Check if span has suggestion data stored in attributes
+        const suggestion = span.getAttribute('data-suggestion');
+        const selectedText = span.getAttribute('data-selected-text');
+        
+        if (suggestion) {
+            // Data is already in the span - just add click handler
+            span.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                showSuggestionTooltip(this, suggestion, selectedText);
+            });
+            console.log(`🔗 Added click handler to span ${span.id} (self-contained data)`);
+        } else {
+            // Fallback: try to get data from storage (for older spans)
+            console.log(`⚠️ Span ${span.id} missing data attributes, attempting storage lookup...`);
+            addClickHandlerFromStorage(span, toolId);
+        }
+    });
+}
+
+// Fallback function to add click handlers using storage data
+async function addClickHandlerFromStorage(span, toolId) {
     const bodyElement = document.body;
     const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
     const weaveId = bodyElement.dataset.weave || extractFromUrl('weave') || 'unknown';
@@ -1471,20 +1499,17 @@ async function addClickHandlersToRestoredSpans(textContent, toolId) {
         const suggestions = result[storageKey] || {};
         const toolSuggestions = suggestions[toolId] || [];
         
-        spans.forEach(span => {
-            // Find the matching suggestion for this span
-            const suggestion = toolSuggestions.find(s => s.spanId === span.id);
-            if (suggestion) {
-                span.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    showSuggestionTooltip(this, suggestion.suggestion, suggestion.selectedText);
-                });
-                console.log(`🔗 Added click handler to span ${span.id}`);
-            }
-        });
+        const suggestion = toolSuggestions.find(s => s.spanId === span.id);
+        if (suggestion) {
+            span.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                showSuggestionTooltip(this, suggestion.suggestion, suggestion.selectedText);
+            });
+            console.log(`🔗 Added click handler to span ${span.id} (from storage)`);
+        }
     } catch (error) {
-        console.error('❌ Error adding click handlers to spans:', error);
+        console.error('❌ Error adding click handler from storage:', error);
     }
 }
 
