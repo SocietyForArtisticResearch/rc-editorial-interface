@@ -174,14 +174,19 @@ function extractToolContent(tool) {
     if (tool.dataset.tool === 'text') {
         const textContent = tool.querySelector('.html-text-editor-content');
         if (textContent) {
+            const currentHtml = textContent.innerHTML.trim();
+            const hasSpansNow = currentHtml.includes('rc-suggestion-highlight');
+            
             // Get the original HTML by removing any existing suggestion spans
-            const originalHtml = removeExistingSuggestionSpans(textContent.innerHTML.trim());
+            const originalHtml = removeExistingSuggestionSpans(currentHtml);
+            
+            console.log(`📝 Tool ${toolData.id}: spans=${hasSpansNow}, html=${originalHtml.length}chars, htmlSpan=${currentHtml.length}chars`);
             
             // Get both plain text and HTML content
             toolData.content = {
                 plainText: textContent.innerText.trim(),
                 html: originalHtml, // Always the original HTML without spans
-                htmlSpan: textContent.innerHTML.trim() // Current HTML state with any existing suggestion spans
+                htmlSpan: currentHtml // Current HTML state with any existing suggestion spans
             };
         }
     }
@@ -236,8 +241,19 @@ async function storeToolsInMemory(tools) {
     tools.forEach(tool => {
         const toolData = extractToolContent(tool);
         
-        // Add suggestions for this tool
+        // Preserve existing htmlSpan data if it has spans and current DOM doesn't
         const toolId = toolData.id;
+        const existingToolData = expositionData.weaves[weaveId]?.tools?.find(t => t.id === toolId);
+        
+        if (existingToolData?.content?.htmlSpan && 
+            existingToolData.content.htmlSpan !== existingToolData.content.html &&
+            toolData.content.htmlSpan === toolData.content.html) {
+            
+            console.log(`🔒 Preserving existing span data for tool ${toolId} (${existingToolData.content.htmlSpan.length} chars)`);
+            toolData.content.htmlSpan = existingToolData.content.htmlSpan;
+        }
+        
+        // Add suggestions for this tool
         console.log(`RC Tool Commenter: Processing tool ${toolId}, looking for suggestions...`);
         toolData.suggestions = suggestions[toolId] || [];
         toolData.suggestionCount = toolData.suggestions.length;
@@ -668,6 +684,7 @@ let cachedTools = null;
 let cachedToolsData = null;
 let lastToolIdentification = 0;
 let toolsStoredForCurrentWeave = false; // Flag to prevent repeated storage calls
+let suggestionBadgesRestored = false; // Flag to prevent repeated badge restoration
 
 // Function to toggle between normal and text-only view
 async function toggleTextOnlyView() {
@@ -1381,7 +1398,7 @@ async function saveSuggestion(toolOrData, selection, suggestionText) {
     // Re-store tools to update suggestion counts in export data
     const allTextTools = document.querySelectorAll('.tool-text, .tool-simpletext');
     if (allTextTools.length > 0) {
-        console.log('RC Tool Commenter: Re-storing tools with updated suggestion data');
+        console.log(`💾 Re-storing tool ${toolId} with spans in DOM:`, tool ? tool.querySelector('.html-text-editor-content')?.innerHTML?.includes('rc-suggestion-highlight') : 'no DOM tool');
         await storeToolsInMemory(Array.from(allTextTools));
     }
     
@@ -1732,7 +1749,12 @@ async function enhanceTools() {
     }
     
     // Restore suggestion badges for tools that have suggestions
-    await restoreSuggestionBadges(tools);
+    // Always check all text tools, not just newly enhanced ones
+    if (!suggestionBadgesRestored) {
+        const allTextTools = document.querySelectorAll('.tool-text, .tool-simpletext');
+        await restoreSuggestionBadges(Array.from(allTextTools));
+        suggestionBadgesRestored = true; // Prevent repeated calls
+    }
     
     // Set up global suggestion interface (only once)
     if (!window.rcGlobalSuggestionSetup) {
@@ -1803,14 +1825,72 @@ async function restoreSuggestionBadges(tools) {
     const result = await browser.storage.local.get(storageKey);
     const suggestions = result[storageKey] || {};
     
-    // Add badges to tools that have suggestions
+    // Get stored tool data for this exposition to access htmlSpan content
+    const expositionStorageKey = `rc_exposition_${expositionId}`;
+    const expositionResult = await browser.storage.local.get(expositionStorageKey);
+    const expositionData = expositionResult[expositionStorageKey];
+    
+    console.log('RC Tool Commenter: Restoring badges and highlights for suggestions:', Object.keys(suggestions));
+    
+    // Add badges to tools that have suggestions and restore visual highlights
     tools.forEach(tool => {
         const toolId = tool.dataset.id;
+        
         if (toolId && suggestions[toolId] && suggestions[toolId].length > 0) {
             const suggestionCount = suggestions[toolId].length;
+            console.log(`🔍 Tool ${toolId} has ${suggestionCount} suggestions - restoring`);
+            
             addSuggestionBadge(tool, suggestionCount);
+            
+            // Restore htmlSpan content for this tool
+            restoreToolHtmlSpan(tool, toolId, expositionData, weaveId);
         }
     });
+}
+
+// Function to restore htmlSpan content for a tool
+function restoreToolHtmlSpan(tool, toolId, expositionData, weaveId) {
+    try {
+        console.log(`🔧 Restoring spans for tool ${toolId}`);
+        
+        // Find the text content area
+        const textContent = tool.querySelector('.html-text-editor-content');
+        if (!textContent) {
+            console.log(`❌ No text content area found for tool ${toolId}`);
+            return;
+        }
+        
+        // Check if we have stored tool data with htmlSpan
+        if (!expositionData || !expositionData.weaves || !expositionData.weaves[weaveId]) {
+            console.log(`❌ No stored data for weave ${weaveId}`);
+            return;
+        }
+        
+        const weaveData = expositionData.weaves[weaveId];
+        const toolData = weaveData.tools.find(t => t.id === toolId);
+        
+        if (!toolData || !toolData.content) {
+            console.log(`❌ No tool data found for tool ${toolId}`);
+            return;
+        }
+        
+        const hasSpans = textContent.innerHTML.includes('rc-suggestion-highlight');
+        const htmlSpanDifferent = toolData.content.htmlSpan !== toolData.content.html;
+        
+        console.log(`🔧 Tool ${toolId}: hasSpans=${hasSpans}, htmlSpanDifferent=${htmlSpanDifferent}`);
+        console.log(`📊 Tool ${toolId} data: html=${toolData.content.html?.length}chars, htmlSpan=${toolData.content.htmlSpan?.length}chars`);
+        
+        // Restore spans if DOM doesn't have them but storage does
+        if (!hasSpans && htmlSpanDifferent && toolData.content.htmlSpan) {
+            textContent.innerHTML = toolData.content.htmlSpan;
+            console.log(`✅ Restored spans for tool ${toolId} from storage`);
+        } else {
+            console.log(`⚠️ Tool ${toolId}: No restoration needed (hasSpans=${hasSpans}, different=${htmlSpanDifferent})`);
+        }
+        
+    } catch (error) {
+        console.error('❌ Error restoring spans:', error);
+    }
 }
 
 // Function to add suggestion badge to a tool
@@ -2092,6 +2172,7 @@ async function initializeExtension() {
     
     // Reset storage flag for new weave
     toolsStoredForCurrentWeave = false;
+    suggestionBadgesRestored = false; // Reset badge restoration flag for new weave
     
     // Cache CLEAN page content BEFORE any enhancements (only once)
     if (!isTextOnlyView && !originalPageContent) {
