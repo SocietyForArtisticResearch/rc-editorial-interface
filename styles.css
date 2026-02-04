@@ -814,3 +814,18 @@
         gap: 6px;
     }
 }
+
+/* Suggestion highlight spans in text content */
+.rc-suggestion-highlight {
+    background-color: rgba(255, 235, 59, 0.3) !important;
+    border-bottom: 2px solid #FFC107 !important;
+    border-radius: 2px !important;
+    padding: 1px 2px !important;
+    transition: background-color 0.2s ease !important;
+    cursor: help !important;
+}
+
+.rc-suggestion-highlight:hover {
+    background-color: rgba(255, 235, 59, 0.5) !important;
+    box-shadow: 0 2px 4px rgba(255, 193, 7, 0.3) !important;
+}

@@ -157,10 +157,12 @@ function extractToolContent(tool) {
     if (tool.dataset.tool === 'text') {
         const textContent = tool.querySelector('.html-text-editor-content');
         if (textContent) {
+            const currentHtml = textContent.innerHTML.trim();
             // Get both plain text and HTML content
             toolData.content = {
                 plainText: textContent.innerText.trim(),
-                html: textContent.innerHTML.trim()
+                html: textContent.innerHTML.trim(),
+                htmlSpan: currentHtml // Current HTML state with any existing suggestion spans
             };
         }
     }
@@ -1283,15 +1285,38 @@ async function saveSuggestion(toolOrData, selection, suggestionText) {
     const weaveId = bodyElement.dataset.weave || extractFromUrl('weave') || 'unknown';
     
     // Handle both tool DOM elements and tool data objects
-    let toolId, toolType;
+    let toolId, toolType, tool;
     if (toolOrData.dataset) {
         // This is a DOM element
+        tool = toolOrData;
         toolId = toolOrData.dataset.id || 'unknown';
         toolType = toolOrData.dataset.tool || 'unknown';
     } else {
-        // This is tool data
+        // This is tool data - for text-only view we can't modify the DOM
         toolId = toolOrData.id || 'unknown';
         toolType = toolOrData.type || 'unknown';
+        tool = null;
+    }
+    
+    // Generate unique span ID for this suggestion
+    const spanId = `rc-suggestion-${toolId}-${Date.now()}`;
+    
+    // If we have a DOM tool, wrap the selected text in a span with the unique ID
+    if (tool && selection.range) {
+        try {
+            const span = document.createElement('span');
+            span.id = spanId;
+            span.className = 'rc-suggestion-highlight';
+            span.style.cssText = 'background-color: rgba(255, 235, 59, 0.3); border-bottom: 2px solid #FFC107;';
+            
+            // Wrap the selected content
+            selection.range.surroundContents(span);
+            
+            console.log('RC Tool Commenter: Wrapped selection in span with ID:', spanId);
+        } catch (error) {
+            console.warn('RC Tool Commenter: Could not wrap selection in span:', error);
+            // Fall back to the old approach if wrapping fails
+        }
     }
     
     const suggestion = {
@@ -1299,7 +1324,8 @@ async function saveSuggestion(toolOrData, selection, suggestionText) {
         toolId: toolId,
         expositionId: expositionId,
         weaveId: weaveId,
-        selectedText: selection.text,
+        spanId: spanId, // New field: unique identifier for the span
+        selectedText: selection.text, // Keep for backward compatibility and debugging
         suggestion: suggestionText,
         timestamp: new Date().toISOString(),
         url: window.location.href,
@@ -1319,7 +1345,7 @@ async function saveSuggestion(toolOrData, selection, suggestionText) {
     suggestions[toolId].push(suggestion);
     await browser.storage.local.set({ [storageKey]: suggestions });
     
-    console.log('Saved suggestion:', suggestion);
+    console.log('Saved suggestion with span ID:', suggestion);
     
     // Update tool's stored data to include suggestion count (only if we have a DOM tool)
     if (toolOrData.dataset) {
