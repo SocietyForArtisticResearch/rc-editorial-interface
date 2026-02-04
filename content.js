@@ -134,6 +134,23 @@ function extractFromUrl(type) {
     return null;
 }
 
+// Function to remove existing suggestion spans from HTML to get clean original content
+function removeExistingSuggestionSpans(html) {
+    // Create a temporary div to parse the HTML
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+    
+    // Find all suggestion spans and replace them with their text content
+    const suggestionSpans = tempDiv.querySelectorAll('.rc-suggestion-highlight');
+    suggestionSpans.forEach(span => {
+        // Replace the span with its text content
+        const textNode = document.createTextNode(span.textContent);
+        span.parentNode.replaceChild(textNode, span);
+    });
+    
+    return tempDiv.innerHTML.trim();
+}
+
 // Function to extract tool content
 function extractToolContent(tool) {
     // Extract exposition and weave IDs from the page
@@ -157,12 +174,14 @@ function extractToolContent(tool) {
     if (tool.dataset.tool === 'text') {
         const textContent = tool.querySelector('.html-text-editor-content');
         if (textContent) {
-            const currentHtml = textContent.innerHTML.trim();
+            // Get the original HTML by removing any existing suggestion spans
+            const originalHtml = removeExistingSuggestionSpans(textContent.innerHTML.trim());
+            
             // Get both plain text and HTML content
             toolData.content = {
                 plainText: textContent.innerText.trim(),
-                html: textContent.innerHTML.trim(),
-                htmlSpan: currentHtml // Current HTML state with any existing suggestion spans
+                html: originalHtml, // Always the original HTML without spans
+                htmlSpan: textContent.innerHTML.trim() // Current HTML state with any existing suggestion spans
             };
         }
     }
