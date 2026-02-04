@@ -1345,6 +1345,13 @@ async function saveSuggestion(toolOrData, selection, suggestionText) {
             span.className = 'rc-suggestion-highlight';
             span.style.cssText = 'background-color: rgba(255, 235, 59, 0.3); border-bottom: 2px solid #FFC107;';
             
+            // Add click handler to show suggestion
+            span.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                showSuggestionTooltip(this, suggestionText, selection.text);
+            });
+            
             // Wrap the selected content
             selection.range.surroundContents(span);
             
@@ -1446,6 +1453,90 @@ async function updateToolWithSuggestionCount(tool) {
     
     // Use the centralized badge function
     addSuggestionBadge(tool, toolSuggestions.length);
+}
+
+// Function to add click handlers to restored spans
+async function addClickHandlersToRestoredSpans(textContent, toolId) {
+    const spans = textContent.querySelectorAll('.rc-suggestion-highlight');
+    if (spans.length === 0) return;
+    
+    // Get suggestion data for this tool
+    const bodyElement = document.body;
+    const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
+    const weaveId = bodyElement.dataset.weave || extractFromUrl('weave') || 'unknown';
+    const storageKey = `rc_suggestions_${expositionId}_${weaveId}`;
+    
+    try {
+        const result = await browser.storage.local.get(storageKey);
+        const suggestions = result[storageKey] || {};
+        const toolSuggestions = suggestions[toolId] || [];
+        
+        spans.forEach(span => {
+            // Find the matching suggestion for this span
+            const suggestion = toolSuggestions.find(s => s.spanId === span.id);
+            if (suggestion) {
+                span.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    showSuggestionTooltip(this, suggestion.suggestion, suggestion.selectedText);
+                });
+                console.log(`🔗 Added click handler to span ${span.id}`);
+            }
+        });
+    } catch (error) {
+        console.error('❌ Error adding click handlers to spans:', error);
+    }
+}
+
+// Function to show suggestion tooltip
+function showSuggestionTooltip(spanElement, suggestionText, selectedText) {
+    // Remove any existing tooltips
+    const existingTooltips = document.querySelectorAll('.rc-suggestion-tooltip');
+    existingTooltips.forEach(tooltip => tooltip.remove());
+    
+    // Create tooltip element
+    const tooltip = document.createElement('div');
+    tooltip.className = 'rc-suggestion-tooltip';
+    
+    tooltip.innerHTML = `
+        <div class="rc-suggestion-tooltip-header">Suggestion</div>
+        <div class="rc-suggestion-tooltip-text"><strong>Selected:</strong> "${selectedText}"</div>
+        <div class="rc-suggestion-tooltip-suggestion">${suggestionText}</div>
+    `;
+    
+    document.body.appendChild(tooltip);
+    
+    // Position tooltip near the span
+    const spanRect = spanElement.getBoundingClientRect();
+    const tooltipRect = tooltip.getBoundingClientRect();
+    
+    let left = spanRect.left;
+    let top = spanRect.bottom + 10;
+    
+    // Keep tooltip within viewport
+    if (left + tooltipRect.width > window.innerWidth) {
+        left = window.innerWidth - tooltipRect.width - 10;
+    }
+    if (left < 10) left = 10;
+    
+    if (top + tooltipRect.height > window.innerHeight) {
+        top = spanRect.top - tooltipRect.height - 10;
+    }
+    
+    tooltip.style.left = left + 'px';
+    tooltip.style.top = top + 'px';
+    
+    // Close tooltip when clicking elsewhere
+    const closeTooltip = (e) => {
+        if (!tooltip.contains(e.target) && e.target !== spanElement) {
+            tooltip.remove();
+            document.removeEventListener('click', closeTooltip);
+        }
+    };
+    
+    setTimeout(() => {
+        document.addEventListener('click', closeTooltip);
+    }, 100);
 }
 
 // Function to show notification
@@ -1884,6 +1975,9 @@ function restoreToolHtmlSpan(tool, toolId, expositionData, weaveId) {
         if (!hasSpans && htmlSpanDifferent && toolData.content.htmlSpan) {
             textContent.innerHTML = toolData.content.htmlSpan;
             console.log(`✅ Restored spans for tool ${toolId} from storage`);
+            
+            // Add click handlers to restored spans
+            addClickHandlersToRestoredSpans(textContent, toolId);
         } else {
             console.log(`⚠️ Tool ${toolId}: No restoration needed (hasSpans=${hasSpans}, different=${htmlSpanDifferent})`);
         }
