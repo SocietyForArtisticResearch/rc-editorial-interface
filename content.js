@@ -1894,11 +1894,12 @@ async function showToolSuggestions(tool) {
         <div class="rc-suggestion-viewer-content">
             <div class="rc-suggestions-list">
                 ${sortedSuggestions.map((suggestion, index) => `
-                    <div class="rc-suggestion-item">
+                    <div class="rc-suggestion-item" data-span-id="${suggestion.spanId || ''}">
                         <div class="rc-suggestion-meta">
                             <span class="rc-suggestion-number">#${index + 1}</span>
                             <span class="rc-suggestion-date">${formatDate(suggestion.timestamp)}</span>
                             <span class="rc-suggestion-weave">Weave ${suggestion.weaveId}</span>
+                            ${suggestion.spanId ? `<span class="rc-suggestion-span-id">Span: ${suggestion.spanId}</span>` : ''}
                         </div>
                         <div class="rc-suggestion-selected-text">
                             <label>Selected text:</label>
@@ -1909,6 +1910,14 @@ async function showToolSuggestions(tool) {
                             <div class="rc-suggestion-text">${suggestion.suggestion}</div>
                         </div>
                         <div class="rc-suggestion-actions">
+                            ${suggestion.spanId ? `
+                                <button class="rc-highlight-span" data-span-id="${suggestion.spanId}" title="Highlight this suggestion in text">
+                                    <svg width="14" height="14" viewBox="0 0 16 16">
+                                        <path fill="currentColor" d="M8.5 2.687c.654-.689 1.782-.886 3.112-.752 1.234.124 2.503.523 3.388.893v9.923c-.918-.35-2.107-.692-3.287-.81-1.094-.111-2.278-.039-3.213.492V2.687zM8 1.783C7.015.936 5.587.81 4.287.94c-1.514.153-3.042.672-3.994 1.105A.5.5 0 0 0 0 2.5v11a.5.5 0 0 0 .707.455c.882-.4 2.303-.881 3.68-1.02 1.409-.142 2.59.087 3.223.877a.5.5 0 0 0 .78 0c.633-.79 1.814-1.019 3.222-.877 1.378.139 2.8.62 3.681 1.02A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.293-.455c-.952-.433-2.48-.952-3.994-1.105C10.413.809 8.985.936 8 1.783z"/>
+                                    </svg>
+                                    Locate
+                                </button>
+                            ` : ''}
                             <button class="rc-delete-suggestion" data-suggestion-id="${suggestion.id}" title="Delete this suggestion">
                                 <svg width="14" height="14" viewBox="0 0 16 16">
                                     <path fill="currentColor" d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
@@ -1956,10 +1965,19 @@ function formatDate(timestamp) {
 function setupSuggestionViewerHandlers(viewer, tool) {
     const closeBtn = viewer.querySelector('.rc-close-viewer');
     const deleteButtons = viewer.querySelectorAll('.rc-delete-suggestion');
+    const highlightButtons = viewer.querySelectorAll('.rc-highlight-span');
     
     // Close button
     closeBtn.addEventListener('click', () => {
         viewer.remove();
+    });
+    
+    // Highlight span buttons
+    highlightButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const spanId = button.dataset.spanId;
+            highlightSuggestionSpan(spanId);
+        });
     });
     
     // Delete suggestion buttons
@@ -1990,6 +2008,31 @@ function setupSuggestionViewerHandlers(viewer, tool) {
             viewer.remove();
         }
     });
+}
+
+// Function to highlight a suggestion span in the text
+function highlightSuggestionSpan(spanId) {
+    // Find the span element
+    const span = document.getElementById(spanId);
+    
+    if (!span) {
+        showNotification('Could not find the suggestion location in the text');
+        return;
+    }
+    
+    // Scroll to the span
+    span.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    
+    // Add temporary highlighting
+    const originalStyle = span.style.cssText;
+    span.style.cssText = originalStyle + '; background-color: rgba(255, 0, 0, 0.5) !important; box-shadow: 0 0 10px rgba(255, 0, 0, 0.8) !important; transition: all 0.3s ease !important;';
+    
+    // Remove temporary highlighting after 3 seconds
+    setTimeout(() => {
+        span.style.cssText = originalStyle;
+    }, 3000);
+    
+    console.log('RC Tool Commenter: Highlighted suggestion span:', spanId);
 }
 
 // Function to delete a suggestion

@@ -829,3 +829,35 @@
     background-color: rgba(255, 235, 59, 0.5) !important;
     box-shadow: 0 2px 4px rgba(255, 193, 7, 0.3) !important;
 }
+
+/* Span ID display in suggestion viewer */
+.rc-suggestion-span-id {
+    font-size: 10px !important;
+    color: #666 !important;
+    background-color: #f0f0f0 !important;
+    padding: 2px 6px !important;
+    border-radius: 10px !important;
+    font-family: monospace !important;
+}
+
+/* Locate button in suggestion viewer */
+.rc-highlight-span {
+    background: linear-gradient(135deg, #28a745, #20c997) !important;
+    color: white !important;
+    border: none !important;
+    padding: 6px 12px !important;
+    border-radius: 4px !important;
+    font-size: 12px !important;
+    cursor: pointer !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    margin-right: 8px !important;
+    transition: all 0.2s ease !important;
+}
+
+.rc-highlight-span:hover {
+    background: linear-gradient(135deg, #20c997, #17a2b8) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3) !important;
+}
