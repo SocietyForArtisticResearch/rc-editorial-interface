@@ -3,6 +3,88 @@
 
 console.log('RC Tool Commenter: Content script loaded');
 
+// Check if user has edit permissions for the current exposition
+async function checkEditPermissions(expositionId) {
+    // Use cached result if it's recent (within 5 minutes)
+    const now = Date.now();
+    if (permissionCheckCache !== null && (now - permissionCheckTime) < 300000) {
+        console.log('RC Tool Commenter: Using cached permission result:', permissionCheckCache);
+        return permissionCheckCache;
+    }
+    
+    const permUrl = `https://www.researchcatalogue.net/editor/permissions?research=${expositionId}`;
+    try {
+        console.log('RC Tool Commenter: Checking edit permissions for exposition', expositionId);
+        console.log('RC Tool Commenter: Permission URL:', permUrl);
+        
+        const resp = await fetch(permUrl, { method: 'GET', credentials: 'include' });
+        
+        console.log('RC Tool Commenter: Permission response status:', resp.status);
+        console.log('RC Tool Commenter: Permission response headers:', Object.fromEntries(resp.headers.entries()));
+        
+        // Try to read the response body for more info
+        const responseText = await resp.text();
+        console.log('RC Tool Commenter: Permission response body:', responseText.substring(0, 200), responseText.length > 200 ? '...' : '');
+        
+        let hasPermissions = false;
+        
+        if (resp && resp.status === 200) {
+            // Status 200 is not enough - we need an empty response body
+            // If we get HTML content, it means we're being redirected to a login page or error page
+            if (responseText.trim() === '') {
+                console.log('RC Tool Commenter: Edit permissions granted (200 + empty body)');
+                hasPermissions = true;
+            } else {
+                console.log('RC Tool Commenter: Edit permissions denied (200 but HTML content - likely login page)');
+                hasPermissions = false;
+            }
+        } else {
+            console.log('RC Tool Commenter: Edit permissions denied (status:', resp.status, ')');
+            hasPermissions = false;
+        }
+        
+        // Cache the result
+        permissionCheckCache = hasPermissions;
+        permissionCheckTime = now;
+        
+        return hasPermissions;
+    } catch (err) {
+        console.error('RC Tool Commenter: Permission check failed:', err);
+        console.error('RC Tool Commenter: Error details:', {
+            message: err.message,
+            stack: err.stack,
+            name: err.name
+        });
+        
+        // Cache negative result
+        permissionCheckCache = false;
+        permissionCheckTime = now;
+        
+        return false;
+    }
+}
+
+// Show permission denied message
+function showPermissionDeniedMessage() {
+    const message = document.createElement('div');
+    message.className = 'rc-permission-denied';
+    message.innerHTML = `
+        <div class="rc-permission-denied-content">
+            <h3>🔒 Access Denied</h3>
+            <p>You do not have permissions to edit this exposition.</p>
+            <p>The RC Tool Commenter extension requires edit access to function.</p>
+        </div>
+    `;
+    document.body.appendChild(message);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (message.parentNode) {
+            message.remove();
+        }
+    }, 5000);
+}
+
 // Function to detect if we're on a Research Catalogue exposition page
 function isExpositionPage() {
     return window.location.hostname.includes('researchcatalogue.net') && 
@@ -11,7 +93,13 @@ function isExpositionPage() {
 }
 
 // Function to identify tool elements in the exposition
-function identifyTools() {
+async function identifyTools() {
+    // Block if extension is disabled due to permissions
+    if (window.rcExtensionBlocked) {
+        console.log('RC Tool Commenter: identifyTools blocked - no edit permissions');
+        return [];
+    }
+    
     // Skip if we're in text-only view
     if (isTextOnlyView) {
         console.log('RC Tool Commenter: Skipping tool identification - in text-only view');
@@ -43,41 +131,46 @@ function identifyTools() {
     // Debug: Log all potential tools found
     console.log('RC Tool Commenter: Searching for tools...');
     
+    let totalFound = 0;
+    let totalSkipped = 0;
+    
     toolSelectors.forEach(selector => {
         const elements = document.querySelectorAll(selector);
-        console.log(`Found ${elements.length} elements with selector "${selector}"`);
+        totalFound += elements.length;
         
         elements.forEach(element => {
             // Exclude tool-content divs - only target actual tool containers
             if (!element.hasAttribute('data-rc-tool-enhanced') && 
                 !element.classList.contains('tool-content')) {
-                console.log(`Adding tool:`, element, `Class: ${element.className}, Data-tool: ${element.dataset.tool}`);
                 tools.push(element);
             } else {
-                console.log(`Skipping tool (already enhanced or tool-content):`, element);
+                totalSkipped++;
             }
         });
     });
     
+    console.log(`Found ${totalFound} total elements, added ${tools.length} new tools, skipped ${totalSkipped} already processed`);
+    
     // Also look for any div with class starting with 'tool-' that has data-tool attribute
     // But only if we're looking for text tools specifically
     const genericTools = document.querySelectorAll('div.tool-text[data-tool], div.tool-simpletext[data-tool]');
-    console.log(`Found ${genericTools.length} generic text tool elements`);
     
-    genericTools.forEach(element => {
-        if (!element.hasAttribute('data-rc-tool-enhanced') && 
-            !element.classList.contains('tool-content') &&
-            !tools.includes(element)) {
-            console.log(`Adding generic text tool:`, element);
-            tools.push(element);
-        }
-    });
+    if (genericTools.length > 0) {
+        console.log(`Found ${genericTools.length} generic text tool elements`);
+        genericTools.forEach(element => {
+            if (!element.hasAttribute('data-rc-tool-enhanced') && 
+                !element.classList.contains('tool-content') &&
+                !tools.includes(element)) {
+                tools.push(element);
+            }
+        });
+    }
     
-    console.log(`RC Tool Commenter: Total tools to enhance: ${tools.length}`);
-    
-    // Create save button if tools were found
     if (tools.length > 0) {
+        console.log(`RC Tool Commenter: Total tools to enhance: ${tools.length}`);
         createSaveButton();
+    } else {
+        console.log('RC Tool Commenter: No new tools to enhance');
     }
     
     return tools;
@@ -213,11 +306,29 @@ function extractToolContent(tool) {
 
 // Function to store tools in browser storage by exposition and weave
 async function storeToolsInMemory(tools) {
+    // Throttle storage calls to prevent rapid-fire operations
+    const now = Date.now();
+    if (now - lastStorageCall < 1000) {
+        console.log('RC Tool Commenter: Throttling storage call');
+        return;
+    }
+    lastStorageCall = now;
+    
     const bodyElement = document.body;
     const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
     const weaveId = bodyElement.dataset.weave || extractFromUrl('weave') || 'unknown';
     
     console.log(`Storing ${tools.length} tools for exposition ${expositionId}, weave ${weaveId}`);
+    
+    // Check permissions before storing anything
+    if (expositionId !== 'unknown') {
+        const hasPermissions = await checkEditPermissions(expositionId);
+        if (!hasPermissions) {
+            console.log('RC Tool Commenter: Storage blocked - user lacks edit permissions');
+            showPermissionDeniedMessage();
+            return;
+        }
+    }
     
     // Get existing stored tools for this exposition
     const storageKey = `rc_exposition_${expositionId}`;
@@ -683,8 +794,12 @@ let originalPageContent = null;
 let cachedTools = null;
 let cachedToolsData = null;
 let lastToolIdentification = 0;
+let isInitialized = false; // Prevent duplicate initialization
 let toolsStoredForCurrentWeave = false; // Flag to prevent repeated storage calls
 let suggestionBadgesRestored = false; // Flag to prevent repeated badge restoration
+let lastStorageCall = 0; // Throttle storage operations
+let permissionCheckCache = null; // Cache permission check results
+let permissionCheckTime = 0; // Track when permissions were last checked
 
 // Function to toggle between normal and text-only view
 async function toggleTextOnlyView() {
@@ -1343,7 +1458,6 @@ async function saveSuggestion(toolOrData, selection, suggestionText) {
             const span = document.createElement('span');
             span.id = spanId;
             span.className = 'rc-suggestion-highlight';
-            span.style.cssText = 'background-color: rgba(255, 235, 59, 0.3); border-bottom: 2px solid #FFC107;';
             
             // Store suggestion data directly in the span
             span.setAttribute('data-suggestion', suggestionText);
@@ -1846,9 +1960,11 @@ async function enhanceTools() {
         return;
     }
     
-    const tools = identifyTools();
+    const tools = await identifyTools();
     
-    console.log(`RC Tool Commenter: Found ${tools.length} tools to enhance`);
+    if (tools.length > 0) {
+        console.log(`RC Tool Commenter: Enhancing ${tools.length} new tools`);
+    }
     
     // Store found tools in memory for cross-weave collection
     if (tools.length > 0) {
@@ -2282,9 +2398,36 @@ async function deleteSuggestion(suggestionId, tool) {
 
 // Function to initialize the extension
 async function initializeExtension() {
+    if (isInitialized) {
+        console.log('RC Tool Commenter: Already initialized, skipping duplicate call');
+        return;
+    }
+    
+    console.log('RC Tool Commenter: *** initializeExtension() called ***');
+    isInitialized = true;
+    
     if (!isExpositionPage()) {
         console.log('RC Tool Commenter: Not on a Research Catalogue exposition page');
         return;
+    }
+    
+    // FIRST: Check permissions before doing ANYTHING else
+    const bodyElement = document.body;
+    const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
+    
+    if (expositionId !== 'unknown') {
+        console.log('RC Tool Commenter: Checking edit permissions for exposition', expositionId);
+        const hasPermissions = await checkEditPermissions(expositionId);
+        
+        if (!hasPermissions) {
+            console.log('RC Tool Commenter: BLOCKING EXTENSION - User lacks edit permissions');
+            showPermissionDeniedMessage();
+            window.rcExtensionBlocked = true;
+            return;
+        } else {
+            console.log('RC Tool Commenter: Permission check passed, proceeding with initialization');
+            window.rcExtensionBlocked = false;
+        }
     }
     
     console.log('RC Tool Commenter: Initializing on exposition page');
@@ -2305,16 +2448,14 @@ async function initializeExtension() {
         console.log('Initial cache of tools for text-only view:', cachedTools.length);
     }
     
-    // Debug: Check all available tools on the page
-    const allTools = document.querySelectorAll('[class*="tool-"]');
-    console.log('RC Tool Commenter: All elements with "tool-" in class:', allTools.length);
-    allTools.forEach((tool, i) => {
-        console.log(`Tool ${i+1}:`, tool.className, 'Data-tool:', tool.dataset.tool, tool);
-    });
+    // Debug: Check all available tools on the page (commented out to reduce console spam)
+    // const allTools = document.querySelectorAll('[class*="tool-"]');
+    // console.log('RC Tool Commenter: All elements with "tool-" in class:', allTools.length);
+    // allTools.forEach((tool, i) => {
+    //     console.log(`Tool ${i+1}:`, tool.className, 'Data-tool:', tool.dataset.tool, tool);
+    // });
     
     // Load existing data to update button count
-    const bodyElement = document.body;
-    const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
     const storageKey = `rc_exposition_${expositionId}`;
     const result = await browser.storage.local.get(storageKey);
     
@@ -2326,22 +2467,43 @@ async function initializeExtension() {
         await updateSaveButtonCount(result[storageKey]);
     }
     
-    // Watch for dynamically added content
+    // Watch for dynamically added content (scoped to specific containers)
+    let mutationTimeout = null;
     const observer = new MutationObserver((mutations) => {
-        let shouldRecheck = false;
+        let hasNewTools = false;
         
         mutations.forEach((mutation) => {
             if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-                shouldRecheck = true;
+                // Only check nodes that are likely to contain tools
+                mutation.addedNodes.forEach(node => {
+                    if (node.nodeType === Node.ELEMENT_NODE) {
+                        // Be more specific - only check if the node itself or direct children are tools
+                        if ((node.classList && (node.classList.contains('tool-text') || node.classList.contains('tool-simpletext'))) ||
+                            (node.querySelector && node.querySelector('.tool-text, .tool-simpletext'))) {
+                            hasNewTools = true;
+                        }
+                    }
+                });
             }
         });
         
-        if (shouldRecheck) {
-            setTimeout(enhanceTools, 500); // Delay to allow content to settle
+        if (hasNewTools) {
+            // Debounce enhancement calls to prevent spam
+            if (mutationTimeout) clearTimeout(mutationTimeout);
+            mutationTimeout = setTimeout(() => {
+                console.log('RC Tool Commenter: New tools detected, enhancing...');
+                enhanceTools();
+            }, 1500); // Increased delay to reduce frequency
         }
     });
     
-    observer.observe(document.body, {
+    // Only observe specific containers that are likely to have dynamic tools
+    const weaveContent = document.querySelector('#weave-content') || 
+                        document.querySelector('.weave') || 
+                        document.querySelector('#content') ||
+                        document.body;
+    
+    observer.observe(weaveContent, {
         childList: true,
         subtree: true
     });
@@ -2354,5 +2516,4 @@ if (document.readyState === 'loading') {
     initializeExtension();
 }
 
-// Also run after a delay for dynamic content
-setTimeout(initializeExtension, 2000);
+// Note: Removed duplicate timeout initialization - the isInitialized guard handles this

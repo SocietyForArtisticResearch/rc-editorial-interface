@@ -878,6 +878,54 @@
     font-style: italic !important;
 }
 
+/* Permission denied message */
+.rc-permission-denied {
+    position: fixed !important;
+    top: 20px !important;
+    right: 20px !important;
+    background: #fff !important;
+    border: 2px solid #f44336 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+    z-index: 10000 !important;
+    max-width: 350px !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+    animation: rc-slideIn 0.3s ease-out !important;
+}
+
+.rc-permission-denied-content {
+    padding: 16px !important;
+    color: #333 !important;
+}
+
+.rc-permission-denied h3 {
+    margin: 0 0 12px 0 !important;
+    color: #f44336 !important;
+    font-size: 16px !important;
+    font-weight: bold !important;
+}
+
+.rc-permission-denied p {
+    margin: 0 0 8px 0 !important;
+    font-size: 14px !important;
+    line-height: 1.4 !important;
+}
+
+.rc-permission-denied p:last-child {
+    margin-bottom: 0 !important;
+}
+
+@keyframes rc-slideIn {
+    from {
+        transform: translateX(100%) !important;
+        opacity: 0 !important;
+    }
+    to {
+        transform: translateX(0) !important;
+        opacity: 1 !important;
+    }
+}
+
 /* Span ID display in suggestion viewer */
 .rc-suggestion-span-id {
     font-size: 10px !important;
