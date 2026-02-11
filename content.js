@@ -790,9 +790,6 @@ function showImportStatus(message, type = 'info') {
 
 // Global variable to track view state
 let isTextOnlyView = false;
-let originalPageContent = null;
-let cachedTools = null;
-let cachedToolsData = null;
 let lastToolIdentification = 0;
 let isInitialized = false; // Prevent duplicate initialization
 let toolsStoredForCurrentWeave = false; // Flag to prevent repeated storage calls
@@ -802,20 +799,14 @@ let permissionCheckCache = null; // Cache permission check results
 let permissionCheckTime = 0; // Track when permissions were last checked
 
 // Function to toggle between normal and text-only view
-async function toggleTextOnlyView() {
+function toggleTextOnlyView() {
     const toggleButton = document.getElementById('rc-view-toggle-btn');
     
     console.log('RC Tool Commenter: Toggle clicked, current isTextOnlyView:', isTextOnlyView);
     
     if (!isTextOnlyView) {
-        // Store current tools and their data before switching
-        cachedTools = getAllTextTools();
-        cachedToolsData = cachedTools.map(tool => extractToolContent(tool));
-        console.log('Cached tools before switching:', cachedTools.length);
-        console.log('Cached tools data:', cachedToolsData.length);
-        
         // Switch TO text-only view
-        await showTextOnlyView();
+        showTextOnlyView();
         isTextOnlyView = true;
         console.log('RC Tool Commenter: Switched TO text-only view');
         
@@ -849,206 +840,400 @@ async function toggleTextOnlyView() {
     }
 }
 
-// Function to show text-only view
-async function showTextOnlyView() {
-    // Use cached tools or get them fresh
-    const tools = cachedTools || getAllTextTools();
-    console.log('Using tools for text-only view:', tools.length);
+// Function to show text-only view using CSS
+function showTextOnlyView() {
+    console.log('RC Tool Commenter: Switching to text-only view with CSS');
     
-    const bodyElement = document.body;
-    const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
-    const weaveId = extractFromUrl('weave') || bodyElement.dataset.weave || 'unknown';
+    // Detect weave type from HTML class
+    const htmlElement = document.documentElement;
+    const isWeaveGraphical = htmlElement.classList.contains('weave-graphical');
+    const isWeaveBlock = htmlElement.classList.contains('weave-block');
     
-    // Get suggestions for this weave
-    const storageKey = `rc_suggestions_${expositionId}_${weaveId}`;
-    const result = await browser.storage.local.get(storageKey);
-    const suggestions = result[storageKey] || {};
+    console.log('RC Tool Commenter: Detected weave type:', {
+        isWeaveGraphical,
+        isWeaveBlock,
+        htmlClasses: htmlElement.className
+    });
     
-    // Create text-only view container
-    const textOnlyContainer = document.createElement('div');
-    textOnlyContainer.id = 'rc-text-only-view';
-    textOnlyContainer.className = 'rc-text-only-container';
+    // Add text-only class to body to trigger CSS styling
+    document.body.classList.add('rc-text-only-mode');
     
-    // Add header
-    const header = document.createElement('div');
-    header.className = 'rc-text-only-header';
-    header.innerHTML = `
-        <h2>Text-Only View</h2>
-        <p>Showing ${tools.length} text tools from current weave</p>
-    `;
-    textOnlyContainer.appendChild(header);
+    // Store original styles before making changes
+    const textTools = document.querySelectorAll('.tool-text, .tool-simpletext');
+    console.log('RC Tool Commenter: Found', textTools.length, 'text tools to style');
     
-    // Create scrollable content area
-    const contentArea = document.createElement('div');
-    contentArea.className = 'rc-text-only-content';
-    
-    // Process each tool
-    tools.forEach((tool, index) => {
-        // Use cached tool data if available, otherwise extract fresh
-        const toolData = cachedToolsData ? cachedToolsData[index] : extractToolContent(tool);
-        const toolId = toolData.id || (tool.dataset ? tool.dataset.id : null);
-        
-        if (!toolId) {
-            console.warn('No tool ID found for tool', index);
-            return;
+    // Store the original container information for each tool
+    textTools.forEach((tool, index) => {
+        // Store original styles for restoration
+        if (!tool.hasAttribute('data-rc-original-style')) {
+            tool.setAttribute('data-rc-original-style', tool.getAttribute('style') || '');
         }
         
-        const toolSuggestions = suggestions[toolId] || [];
-        
-        // Create tool item
-        const toolItem = document.createElement('div');
-        toolItem.className = 'rc-text-only-item';
-        toolItem.dataset.originalToolId = toolId;
-        
-        // Add tool header with number and suggestion count
-        const toolHeader = document.createElement('div');
-        toolHeader.className = 'rc-text-only-item-header';
-        toolHeader.innerHTML = `
-            <span class="rc-tool-number">Tool #${index + 1}</span>
-            <span class="rc-tool-id">ID: ${toolId}</span>
-            ${toolSuggestions.length > 0 ? `<span class="rc-suggestion-indicator">${toolSuggestions.length} suggestion${toolSuggestions.length > 1 ? 's' : ''}</span>` : ''}
-        `;
-        
-        // Add suggestion badge if there are suggestions
-        if (toolSuggestions.length > 0) {
-            const badge = document.createElement('div');
-            badge.className = 'rc-suggestion-count rc-text-view-badge';
-            badge.textContent = toolSuggestions.length;
-            badge.addEventListener('click', async () => {
-                // Create a mock tool object for the suggestion viewer
-                const mockTool = { dataset: { id: toolId } };
-                await showToolSuggestions(mockTool);
-            });
-            toolHeader.appendChild(badge);
-        }
-        
-        toolItem.appendChild(toolHeader);
-        
-        // Add tool content
-        const toolContent = document.createElement('div');
-        toolContent.className = 'rc-text-only-item-content';
-        toolContent.innerHTML = toolData.content.html || toolData.content.plainText;
-        
-        // Make content clickable for suggestions
-        toolContent.addEventListener('click', (event) => {
-            // If Cmd key is pressed, allow normal interaction (don't prevent default)
-            if (event.metaKey) {
-                console.log('RC Tool Commenter: Cmd+click detected, allowing normal interaction');
-                return; // Let the event bubble normally
+        // Store original parent container for restoration
+        if (!tool.hasAttribute('data-rc-original-parent')) {
+            const parent = tool.parentElement;
+            if (parent) {
+                tool.setAttribute('data-rc-original-parent', parent.id || parent.className || 'unknown');
+                // Store a reference to the actual parent element
+                tool._rcOriginalParent = parent;
             }
-            
-            event.preventDefault();
-            event.stopPropagation();
-            
-            const clickX = event.clientX;
-            const clickY = event.clientY;
-            
-            createTextSuggestionInterface(toolData, clickX, clickY);
+        }
+        
+        // Store original tool content styles
+        const toolContent = tool.querySelector('.tool-content, .html-text-editor-content');
+        if (toolContent && !toolContent.hasAttribute('data-rc-original-style')) {
+            toolContent.setAttribute('data-rc-original-style', toolContent.getAttribute('style') || '');
+        }
+        
+        // Apply text-only styling to text tools
+        tool.style.cssText = `
+            display: block !important;
+            position: relative !important;
+            float: none !important;
+            width: 800px !important;
+            max-width: 800px !important;
+            min-width: 800px !important;
+            margin: 20px auto !important;
+            padding: 20px !important;
+            background: white !important;
+            border: 1px solid #ddd !important;
+            border-radius: 8px !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+            z-index: 1 !important;
+            box-sizing: border-box !important;
+            left: auto !important;
+            right: auto !important;
+            top: auto !important;
+            transform: none !important;
+        `;
+        tool.setAttribute('data-rc-text-styled', 'true'); // Mark for restoration
+        
+        // Also apply consistent styling to the tool content area
+        if (toolContent) {
+            toolContent.style.cssText = `
+                width: 100% !important;
+                max-width: none !important;
+                min-width: none !important;
+                margin: 0 !important;
+                padding: 15px !important;
+                border: none !important;
+                box-sizing: border-box !important;
+                position: relative !important;
+                float: none !important;
+                left: auto !important;
+                right: auto !important;
+                top: auto !important;
+                transform: none !important;
+            `;
+        }
+        
+    });
+    
+    // Instead of hiding everything, only hide specific non-essential elements
+    const elementsToHide = [
+        'header', 'nav', '.navigation', '.sidebar', '.footer', 
+        '.tool-picture', '.tool-video', '.tool-audio', '.tool-pdf', 
+        '.tool-slideshow', '.toolbar', '.menu', '.breadcrumb',
+        '.weave-navigation', '.exposition-navigation'
+    ];
+    
+    elementsToHide.forEach(selector => {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach(element => {
+            // Make sure we're not hiding text tools or our extension elements
+            if (!element.closest('.tool-text, .tool-simpletext') && 
+                !element.id?.startsWith('rc-')) {
+                // Store original display style
+                if (!element.hasAttribute('data-rc-original-display')) {
+                    element.setAttribute('data-rc-original-display', 
+                        window.getComputedStyle(element).display);
+                }
+                element.style.display = 'none';
+                element.setAttribute('data-rc-hidden', 'true'); // Mark for restoration
+            }
+        });
+    });
+    
+    // Store original body styles and apply text-only mode styling
+    if (!document.body.hasAttribute('data-rc-original-body-style')) {
+        document.body.setAttribute('data-rc-original-body-style', 
+            document.body.getAttribute('style') || '');
+    }
+    
+    // Handle weave type-specific container logic
+    if (isWeaveGraphical) {
+        console.log('RC Tool Commenter: Using weave-graphical logic');
+        
+        // Hide the main weave container to prevent layout interference
+        const weaveContainer = document.getElementById('container-weave');
+        if (weaveContainer && !weaveContainer.hasAttribute('data-rc-original-display')) {
+            weaveContainer.setAttribute('data-rc-original-display', 
+                window.getComputedStyle(weaveContainer).display);
+            weaveContainer.style.display = 'none';
+            weaveContainer.setAttribute('data-rc-hidden', 'true');
+        }
+        
+        // Create a new container for text-only view
+        let textOnlyContainer = document.getElementById('rc-text-only-container');
+        if (!textOnlyContainer) {
+            textOnlyContainer = document.createElement('div');
+            textOnlyContainer.id = 'rc-text-only-container';
+            textOnlyContainer.style.cssText = `
+                width: 100%;
+                max-width: 900px;
+                margin: 0 auto;
+                padding: 20px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 20px;
+            `;
+            document.body.appendChild(textOnlyContainer);
+        }
+        
+        // Move text tools to the new container
+        textTools.forEach((tool, index) => {
+            textOnlyContainer.appendChild(tool);
         });
         
-        toolItem.appendChild(toolContent);
-        contentArea.appendChild(toolItem);
-    });
+    } else if (isWeaveBlock) {
+        console.log('RC Tool Commenter: Using weave-block logic - moving tools to centered container');
+        
+        // For weave-block, also create a new container and move tools there
+        // This gets rid of the grid structure complexity
+        let textOnlyContainer = document.getElementById('rc-text-only-container');
+        if (!textOnlyContainer) {
+            textOnlyContainer = document.createElement('div');
+            textOnlyContainer.id = 'rc-text-only-container';
+            textOnlyContainer.style.cssText = `
+                width: 100%;
+                max-width: 900px;
+                margin: 0 auto;
+                padding: 20px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 20px;
+            `;
+            document.body.appendChild(textOnlyContainer);
+        }
+        
+        // Hide the main content container to get rid of grid structure
+        const contentContainer = document.getElementById('content');
+        if (contentContainer && !contentContainer.hasAttribute('data-rc-original-display')) {
+            contentContainer.setAttribute('data-rc-original-display', 
+                window.getComputedStyle(contentContainer).display);
+            contentContainer.style.display = 'none';
+            contentContainer.setAttribute('data-rc-hidden', 'true');
+        }
+        
+        // Also hide the container-weave if it exists (some weave-block pages have both)
+        const weaveContainer = document.getElementById('container-weave');
+        if (weaveContainer && !weaveContainer.hasAttribute('data-rc-original-display')) {
+            weaveContainer.setAttribute('data-rc-original-display', 
+                window.getComputedStyle(weaveContainer).display);
+            weaveContainer.style.setProperty('display', 'none', 'important');
+            weaveContainer.style.setProperty('visibility', 'hidden', 'important');
+            weaveContainer.style.setProperty('position', 'absolute', 'important');
+            weaveContainer.style.setProperty('left', '-9999px', 'important');
+            weaveContainer.style.setProperty('top', '-9999px', 'important');
+            weaveContainer.setAttribute('data-rc-hidden', 'true');
+        }
+        
+        // Move text tools to the new container
+        textTools.forEach((tool, index) => {
+            textOnlyContainer.appendChild(tool);
+        });
+        
+    } else {
+        console.log('RC Tool Commenter: Unknown weave type, using fallback logic');
+        // Fallback to keeping tools in place like weave-block
+    }
     
-    textOnlyContainer.appendChild(contentArea);
-    
-    // Replace body content but keep buttons
-    const buttonsToKeep = [
-        document.getElementById('rc-save-tools-btn'),
-        document.getElementById('rc-import-tools-btn'),
-        document.getElementById('rc-view-toggle-btn'),
-        document.getElementById('rc-file-input')
-    ].filter(btn => btn !== null);
-    
-    // Clear body
-    document.body.innerHTML = '';
-    
-    // Add text-only view
-    document.body.appendChild(textOnlyContainer);
-    
-    // Re-add buttons
-    buttonsToKeep.forEach(button => {
-        document.body.appendChild(button);
-    });
+    // Style the body for text-only mode with proper centering
+    document.body.style.cssText = `
+        background: #f5f5f5 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        overflow-y: auto !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        min-height: 100vh !important;
+    `;
+    document.body.setAttribute('data-rc-body-styled', 'true'); // Mark for restoration
 }
 
-// Function to restore normal view
+// Function to restore normal view using CSS
 function showNormalView() {
-    console.log('RC Tool Commenter: Switching back to normal view');
+    console.log('RC Tool Commenter: Switching back to normal view with CSS');
     
-    // Reset view state first
-    isTextOnlyView = false;
+    // Detect weave type from HTML class
+    const htmlElement = document.documentElement;
+    const isWeaveGraphical = htmlElement.classList.contains('weave-graphical');
+    const isWeaveBlock = htmlElement.classList.contains('weave-block');
     
-    // Remove text-only view container if it exists
-    const textOnlyView = document.getElementById('rc-text-only-view');
-    if (textOnlyView) {
-        textOnlyView.remove();
-    }
-    
-    // Check if we have original content to restore
-    if (!originalPageContent) {
-        console.log('RC Tool Commenter: No original content cached, reloading page');
-        window.location.reload();
-        return;
-    }
-    
-    // Restore the original page content
-    document.body.innerHTML = originalPageContent;
-    
-    // Clear enhancement attributes from all restored tools so they can be re-enhanced
-    const restoredTools = document.querySelectorAll('[data-rc-tool-enhanced]');
-    restoredTools.forEach(tool => {
-        tool.removeAttribute('data-rc-tool-enhanced');
-        console.log('RC Tool Commenter: Cleared enhancement attribute from restored tool:', tool.dataset.id);
+    console.log('RC Tool Commenter: Restoring from text view, weave type:', {
+        isWeaveGraphical,
+        isWeaveBlock
     });
     
-    // Remove any leftover RC overlays
-    const leftoverOverlays = document.querySelectorAll('.rc-tool-overlay, .rc-suggestion-interface, .rc-text-only-container');
-    leftoverOverlays.forEach(overlay => overlay.remove());
+    // Remove text-only class from body
+    document.body.classList.remove('rc-text-only-mode');
     
-    // Clear cached data
-    cachedTools = null;
-    cachedToolsData = null;
-    lastToolIdentification = 0;
-    
-    // Re-initialize with a promise-based approach for better control
-    const reinitialize = async () => {
-        try {
-            console.log('RC Tool Commenter: Re-initializing normal view...');
-            console.log('RC Tool Commenter: Page title:', document.title);
-            console.log('RC Tool Commenter: Current URL:', window.location.href);
+    // Handle weave type-specific restoration
+    if (isWeaveGraphical) {
+        console.log('RC Tool Commenter: Using weave-graphical restoration logic');
+        
+        // First, restore the weave container before moving tools back
+        const weaveContainer = document.getElementById('container-weave');
+        if (weaveContainer && weaveContainer.hasAttribute('data-rc-hidden')) {
+            const originalDisplay = weaveContainer.getAttribute('data-rc-original-display');
+            if (originalDisplay) {
+                weaveContainer.style.display = originalDisplay === 'none' ? '' : originalDisplay;
+            } else {
+                weaveContainer.style.display = '';
+            }
+            weaveContainer.removeAttribute('data-rc-hidden');
+            weaveContainer.removeAttribute('data-rc-original-display');
+        }
+        
+        // Then, move text tools back to their original containers
+        const textOnlyContainer = document.getElementById('rc-text-only-container');
+        if (textOnlyContainer) {
+            const textTools = textOnlyContainer.querySelectorAll('.tool-text, .tool-simpletext');
             
-            // Wait for DOM to be ready
-            await new Promise(resolve => setTimeout(resolve, 150));
-            
-            // Check if we're still on a valid RC page
-            if (!window.location.href.includes('researchcatalogue.net')) {
-                console.log('RC Tool Commenter: Not on RC page after restore, skipping initialization');
-                return;
+            // Find the original weave container
+            const weave = document.getElementById('weave');
+            if (weave) {
+                textTools.forEach(tool => {
+                    weave.appendChild(tool);
+                });
             }
             
-            // Force tool re-identification (bypass throttling and full init)
-            console.log('RC Tool Commenter: Forcing tool re-identification...');
-            lastToolIdentification = 0; // Reset throttle
-            await identifyTools(); // Force immediate identification
+            // Remove the text-only container
+            textOnlyContainer.remove();
+        }
+        
+    } else if (isWeaveBlock) {
+        console.log('RC Tool Commenter: Using weave-block restoration logic');
+        
+        // For weave-block, move tools back to their original containers before restoring styles
+        const textOnlyContainer = document.getElementById('rc-text-only-container');
+        if (textOnlyContainer) {
+            const textTools = textOnlyContainer.querySelectorAll('.tool-text, .tool-simpletext');
             
-            // Re-initialize RC navigation functionality
-            console.log('RC Tool Commenter: Re-initializing RC navigation...');
-            reinitializeRCNavigation();
+            // Move tools back to their original parents
+            textTools.forEach(tool => {
+                if (tool._rcOriginalParent) {
+                    tool._rcOriginalParent.appendChild(tool);
+                }
+            });
             
-            console.log('RC Tool Commenter: Normal view restored successfully');
-            
-        } catch (error) {
-            console.error('RC Tool Commenter: Failed to restore normal view:', error);
-            console.log('RC Tool Commenter: Falling back to page reload');
-            // Give user a choice instead of auto-reloading
-            if (confirm('Failed to restore normal view. Reload the page?')) {
-                window.location.reload();
+            // Remove the text-only container
+            textOnlyContainer.remove();
+        }
+        
+        // Restore the content container
+        const contentContainer = document.getElementById('content');
+        if (contentContainer && contentContainer.hasAttribute('data-rc-hidden')) {
+            const originalDisplay = contentContainer.getAttribute('data-rc-original-display');
+            if (originalDisplay) {
+                contentContainer.style.display = originalDisplay === 'none' ? '' : originalDisplay;
+            } else {
+                contentContainer.style.display = '';
+            }
+            contentContainer.removeAttribute('data-rc-hidden');
+            contentContainer.removeAttribute('data-rc-original-display');
+        }
+        
+        // Also restore the weave container if it was hidden
+        const weaveContainer = document.getElementById('container-weave');
+        if (weaveContainer && weaveContainer.hasAttribute('data-rc-hidden')) {
+            const originalDisplay = weaveContainer.getAttribute('data-rc-original-display');
+            // Restore display property
+            weaveContainer.style.removeProperty('display');
+            if (originalDisplay && originalDisplay !== 'none') {
+                weaveContainer.style.display = originalDisplay;
+            }
+            // Remove all the hiding properties
+            weaveContainer.style.removeProperty('visibility');
+            weaveContainer.style.removeProperty('position');
+            weaveContainer.style.removeProperty('left');
+            weaveContainer.style.removeProperty('top');
+            weaveContainer.removeAttribute('data-rc-hidden');
+            weaveContainer.removeAttribute('data-rc-original-display');
+        }
+        
+    } else {
+        console.log('RC Tool Commenter: Using fallback restoration logic');
+        // Fallback logic similar to weave-block
+    }
+    
+    // Common restoration logic for all weave types
+    
+    // Restore hidden elements using stored original display values
+    const hiddenElements = document.querySelectorAll('[data-rc-hidden="true"]');
+    hiddenElements.forEach(element => {
+        // Skip weave container as we may have already handled it above
+        if (!element.id || element.id !== 'container-weave') {
+            const originalDisplay = element.getAttribute('data-rc-original-display');
+            if (originalDisplay) {
+                element.style.display = originalDisplay === 'none' ? '' : originalDisplay;
+            } else {
+                element.style.display = '';
             }
         }
-    };
+        element.removeAttribute('data-rc-hidden');
+        element.removeAttribute('data-rc-original-display');
+    });
     
-    reinitialize();
+    // Reset text tools styling using stored original styles
+    const styledTextTools = document.querySelectorAll('[data-rc-text-styled="true"]');
+    styledTextTools.forEach(tool => {
+        // Restore original tool styles
+        const originalStyle = tool.getAttribute('data-rc-original-style');
+        if (originalStyle) {
+            tool.setAttribute('style', originalStyle);
+        } else {
+            tool.removeAttribute('style');
+        }
+        tool.removeAttribute('data-rc-text-styled');
+        tool.removeAttribute('data-rc-original-style');
+        
+        // Also restore tool content styling
+        const toolContent = tool.querySelector('.tool-content, .html-text-editor-content');
+        if (toolContent) {
+            const originalContentStyle = toolContent.getAttribute('data-rc-original-style');
+            if (originalContentStyle) {
+                toolContent.setAttribute('style', originalContentStyle);
+            } else {
+                toolContent.removeAttribute('style');
+            }
+            toolContent.removeAttribute('data-rc-original-style');
+        }
+        
+        // Clean up stored parent references and data attributes
+        tool.removeAttribute('data-rc-original-parent');
+        if (tool._rcOriginalParent) {
+            delete tool._rcOriginalParent;
+        }
+    });
+    
+    // Reset body styling using stored original style
+    const originalBodyStyle = document.body.getAttribute('data-rc-original-body-style');
+    if (document.body.hasAttribute('data-rc-body-styled')) {
+        if (originalBodyStyle) {
+            document.body.setAttribute('style', originalBodyStyle);
+        } else {
+            document.body.removeAttribute('style');
+        }
+        document.body.removeAttribute('data-rc-body-styled');
+        document.body.removeAttribute('data-rc-original-body-style');
+    }
+    
+    console.log('RC Tool Commenter: Normal view restoration complete');
 }
 
 // Function to re-initialize Research Catalogue's navigation functionality
@@ -1208,44 +1393,32 @@ function addNavigationCSS() {
 }
 
 // Function to create text suggestion interface
-function createTextSuggestionInterface(toolOrData, clickX, clickY) {
+function createTextSuggestionInterface(tool, clickX, clickY) {
     // Remove any existing suggestion interface
     const existingSuggestion = document.getElementById('rc-text-suggestion');
     if (existingSuggestion) {
         existingSuggestion.remove();
     }
     
-    // Handle both tool DOM elements and tool data objects
-    let tool, toolData;
-    if (toolOrData.dataset) {
-        // This is a DOM element
-        tool = toolOrData;
-        toolData = extractToolContent(tool);
-    } else {
-        // This is already tool data
-        toolData = toolOrData;
-        tool = null;
+    if (!tool || !tool.dataset) {
+        showNotification('Error: Invalid tool element');
+        return;
     }
     
-    // Create suggestion overlay
-    const suggestionOverlay = document.createElement('div');
-    suggestionOverlay.id = 'rc-text-suggestion';
-    suggestionOverlay.className = 'rc-text-suggestion-overlay';
-    
-    // For text-only view, we work with the toolData content directly
-    // For normal view, try to find text content within the tool
-    let textContent = null;
-    if (tool) {
-        textContent = tool.querySelector('.html-text-editor-content');
-    }
-    
-    if (!textContent && !toolData.content) {
+    // Find text content within the tool
+    const textContent = tool.querySelector('.html-text-editor-content');
+    if (!textContent) {
         showNotification('No editable text found in this tool');
         return;
     }
     
     // Get the HTML content to display
-    const htmlContent = textContent ? textContent.innerHTML : (toolData.content.html || toolData.content.plainText);
+    const htmlContent = textContent.innerHTML;
+    
+    // Create suggestion interface HTML
+    const suggestionOverlay = document.createElement('div');
+    suggestionOverlay.id = 'rc-text-suggestion';
+    suggestionOverlay.className = 'rc-text-suggestion-overlay';
     
     // Create suggestion interface HTML
     suggestionOverlay.innerHTML = `
@@ -1293,13 +1466,13 @@ function createTextSuggestionInterface(toolOrData, clickX, clickY) {
     document.body.appendChild(suggestionOverlay);
     
     // Set up event handlers
-    setupSuggestionEventHandlers(suggestionOverlay, tool, toolData);
+    setupSuggestionEventHandlers(suggestionOverlay, tool);
     
     return suggestionOverlay;
 }
 
 // Function to set up suggestion interface event handlers
-function setupSuggestionEventHandlers(overlay, tool, toolData) {
+function setupSuggestionEventHandlers(overlay, tool) {
     const closeBtn = overlay.querySelector('.rc-close-suggestion');
     const selectableText = overlay.querySelector('.rc-selectable-text');
     const suggestionForm = overlay.querySelector('.rc-suggestion-form');
@@ -1349,15 +1522,20 @@ function setupSuggestionEventHandlers(overlay, tool, toolData) {
         console.log('RC Tool Commenter: Save button clicked');
         console.log('Current selection:', currentSelection);
         console.log('Suggestion text:', suggestionTextarea.value.trim());
-        console.log('Tool/toolData:', tool || toolData);
+        console.log('Tool:', tool);
         
         if (!currentSelection || !suggestionTextarea.value.trim()) {
             showNotification('Please select text and enter a suggestion');
             return;
         }
         
+        if (!tool) {
+            showNotification('Error: No tool element found');
+            return;
+        }
+        
         try {
-            await saveSuggestion(tool || toolData, currentSelection, suggestionTextarea.value.trim());
+            await saveSuggestion(tool, currentSelection, suggestionTextarea.value.trim());
             console.log('RC Tool Commenter: Suggestion saved successfully');
             overlay.remove();
             showNotification('Suggestion saved successfully');
@@ -1430,56 +1608,71 @@ function clearHighlights(container) {
 }
 
 // Function to save suggestion
-async function saveSuggestion(toolOrData, selection, suggestionText) {
+async function saveSuggestion(tool, selection, suggestionText) {
     const bodyElement = document.body;
     const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
     const weaveId = bodyElement.dataset.weave || extractFromUrl('weave') || 'unknown';
     
-    // Handle both tool DOM elements and tool data objects
-    let toolId, toolType, tool;
-    if (toolOrData.dataset) {
-        // This is a DOM element
-        tool = toolOrData;
-        toolId = toolOrData.dataset.id || 'unknown';
-        toolType = toolOrData.dataset.tool || 'unknown';
-    } else {
-        // This is tool data - for text-only view we can't modify the DOM
-        toolId = toolOrData.id || 'unknown';
-        toolType = toolOrData.type || 'unknown';
-        tool = null;
-    }
+    // Extract tool information from DOM element
+    const toolId = tool.dataset.id || 'unknown';
+    const toolType = tool.dataset.tool || 'unknown';
     
     // Generate unique span ID for this suggestion
     const spanId = `rc-suggestion-${toolId}-${Date.now()}`;
     
-    // If we have a DOM tool, wrap the selected text in a span with the unique ID
-    if (tool && selection.range) {
-        try {
-            const span = document.createElement('span');
-            span.id = spanId;
-            span.className = 'rc-suggestion-highlight';
-            
-            // Store suggestion data directly in the span
-            span.setAttribute('data-suggestion', suggestionText);
-            span.setAttribute('data-selected-text', selection.text);
-            
-            // Add click handler to show suggestion
-            span.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                const suggestion = this.getAttribute('data-suggestion');
-                const selectedText = this.getAttribute('data-selected-text');
-                showSuggestionTooltip(this, suggestion, selectedText);
-            });
-            
-            // Wrap the selected content
+    // Find the text content area within the tool
+    const textContent = tool.querySelector('.html-text-editor-content');
+    if (!textContent) {
+        throw new Error('No text content area found in tool');
+    }
+    
+    // Wrap the selected text in a span with the unique ID
+    try {
+        const span = document.createElement('span');
+        span.id = spanId;
+        span.className = 'rc-suggestion-highlight';
+        
+        // Store suggestion data directly in the span
+        span.setAttribute('data-suggestion', suggestionText);
+        span.setAttribute('data-selected-text', selection.text);
+        
+        // Add click handler to show suggestion
+        span.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const suggestion = this.getAttribute('data-suggestion');
+            const selectedText = this.getAttribute('data-selected-text');
+            showSuggestionTooltip(this, suggestion, selectedText);
+        });
+        
+        // Wrap the selected content using the range from the selection
+        if (selection.range) {
             selection.range.surroundContents(span);
-            
-            console.log('RC Tool Commenter: Wrapped selection in span with ID:', spanId);
-        } catch (error) {
-            console.warn('RC Tool Commenter: Could not wrap selection in span:', error);
-            // Fall back to the old approach if wrapping fails
+        } else {
+            // Fallback: simple text replacement if no range available
+            const toolText = textContent.innerHTML;
+            const selectedText = selection.text;
+            if (toolText.includes(selectedText)) {
+                const spanHtml = `<span id="${spanId}" class="rc-suggestion-highlight" data-suggestion="${suggestionText.replace(/"/g, '&quot;')}" data-selected-text="${selectedText.replace(/"/g, '&quot;')}">${selectedText}</span>`;
+                textContent.innerHTML = toolText.replace(selectedText, spanHtml);
+                // Re-add click handler to the newly created span
+                const newSpan = textContent.querySelector(`#${spanId}`);
+                if (newSpan) {
+                    newSpan.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const suggestion = this.getAttribute('data-suggestion');
+                        const selectedText = this.getAttribute('data-selected-text');
+                        showSuggestionTooltip(this, suggestion, selectedText);
+                    });
+                }
+            }
         }
+        
+        console.log('RC Tool Commenter: Wrapped selection in span with ID:', spanId);
+    } catch (error) {
+        console.warn('RC Tool Commenter: Could not wrap selection in span:', error);
+        throw new Error('Failed to create suggestion highlight');
     }
     
     const suggestion = {
@@ -1510,10 +1703,8 @@ async function saveSuggestion(toolOrData, selection, suggestionText) {
     
     console.log('Saved suggestion with span ID:', suggestion);
     
-    // Update tool's stored data to include suggestion count (only if we have a DOM tool)
-    if (toolOrData.dataset) {
-        await updateToolWithSuggestionCount(toolOrData);
-    }
+    // Update tool's stored data to include suggestion count
+    await updateToolWithSuggestionCount(tool);
     
     // Update save button with new suggestion count
     const expositionStorageKey = `rc_exposition_${expositionId}`;
@@ -1525,35 +1716,8 @@ async function saveSuggestion(toolOrData, selection, suggestionText) {
     // Re-store tools to update suggestion counts in export data
     const allTextTools = document.querySelectorAll('.tool-text, .tool-simpletext');
     if (allTextTools.length > 0) {
-        console.log(`💾 Re-storing tool ${toolId} with spans in DOM:`, tool ? tool.querySelector('.html-text-editor-content')?.innerHTML?.includes('rc-suggestion-highlight') : 'no DOM tool');
+        console.log(`💾 Re-storing tool ${toolId} with spans in DOM:`, tool.querySelector('.html-text-editor-content')?.innerHTML?.includes('rc-suggestion-highlight'));
         await storeToolsInMemory(Array.from(allTextTools));
-    }
-    
-    // If we're in text-only view, update the suggestion badge for this tool
-    if (isTextOnlyView) {
-        const textOnlyItem = document.querySelector(`[data-original-tool-id="${toolId}"]`);
-        if (textOnlyItem) {
-            // Update or add suggestion badge in text-only view
-            const existingBadge = textOnlyItem.querySelector('.rc-text-view-badge');
-            const toolSuggestions = suggestions[toolId] || [];
-            const newCount = toolSuggestions.length;
-            
-            if (existingBadge) {
-                existingBadge.textContent = newCount;
-            } else if (newCount > 0) {
-                const header = textOnlyItem.querySelector('.rc-text-only-item-header');
-                if (header) {
-                    const badge = document.createElement('div');
-                    badge.className = 'rc-suggestion-count rc-text-view-badge';
-                    badge.textContent = newCount;
-                    badge.addEventListener('click', async () => {
-                        const mockTool = { dataset: { id: toolId } };
-                        await showToolSuggestions(mockTool);
-                    });
-                    header.appendChild(badge);
-                }
-            }
-        }
     }
 }
 
@@ -2435,18 +2599,6 @@ async function initializeExtension() {
     // Reset storage flag for new weave
     toolsStoredForCurrentWeave = false;
     suggestionBadgesRestored = false; // Reset badge restoration flag for new weave
-    
-    // Cache CLEAN page content BEFORE any enhancements (only once)
-    if (!isTextOnlyView && !originalPageContent) {
-        originalPageContent = document.body.innerHTML;
-        console.log('RC Tool Commenter: Cached clean page content for view switching');
-    }
-    
-    // Cache tools immediately for text-only view
-    if (!cachedTools) {
-        cachedTools = getAllTextTools();
-        console.log('Initial cache of tools for text-only view:', cachedTools.length);
-    }
     
     // Debug: Check all available tools on the page (commented out to reduce console spam)
     // const allTools = document.querySelectorAll('[class*="tool-"]');
