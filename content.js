@@ -1730,12 +1730,14 @@ async function saveSuggestion(tool, selection, suggestionText) {
                         // Apply the enhanced content to the actual tool via RC's API
                         // Use script injection to execute the function in page scope
                 const executeScript = document.createElement('script');
+                // Properly escape the content to prevent syntax errors
+                const escapedContent = JSON.stringify(enhancedContent);
                 executeScript.textContent = `
                     (async function() {
                         try {
                             if (typeof window.applyRCToolUpdate === 'function') {
                                 console.log('📞 Calling applyRCToolUpdate from page scope...');
-                                const result = await window.applyRCToolUpdate('${toolId}', \`${enhancedContent.replace(/`/g, '\\`')}\`, '${expositionId}');
+                                const result = await window.applyRCToolUpdate('${toolId}', ${escapedContent}, '${expositionId}');
                                 
                                 if (result.success) {
                                     console.log('✅ Successfully applied suggestion to RC tool!');
@@ -3025,7 +3027,9 @@ async function initializeExtension() {
     
     // **INJECT RC TOOL UPDATE FUNCTIONS IMMEDIATELY**
     // Small delay to ensure DOM is ready for script injection
+    console.log('🔧 About to inject RC tool update functions...');
     setTimeout(() => {
+        console.log('🔧 Calling injectRCToolUpdateFunctions...');
         injectRCToolUpdateFunctions();
         
         // Verify injection worked by checking the script element was added
@@ -3043,6 +3047,7 @@ async function initializeExtension() {
 
 // FUNCTION INJECTION FOR RC TOOL UPDATES
 function injectRCToolUpdateFunctions() {
+    console.log('🔧 injectRCToolUpdateFunctions() called');
     try {
         // Ensure functions are available globally for testing
         window.RCToolUpdater = {
