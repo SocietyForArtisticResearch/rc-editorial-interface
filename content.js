@@ -2952,6 +2952,9 @@ async function initializeExtension() {
     
     console.log('RC Tool Commenter: Initializing on exposition page');
     
+    // Extract weave ID for logging and processing
+    const weaveId = bodyElement.dataset.weave || extractFromUrl('weave') || 'unknown';
+    
     // Debug: Log the extracted IDs
     console.log(`🔍 Detected exposition ID: ${expositionId}, weave ID: ${weaveId}`);
     console.log(`🌐 Current URL: ${window.location.href}`);
