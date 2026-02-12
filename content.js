@@ -840,6 +840,118 @@ function toggleTextOnlyView() {
     }
 }
 
+// Constants for frequently-used selectors
+const TEXT_TOOLS_SELECTOR = '.tool-text, .tool-simpletext';
+
+// Constants for text-only view styling
+const TEXT_ONLY_TOOL_STYLES = `
+    display: block !important;
+    position: relative !important;
+    float: none !important;
+    width: 800px !important;
+    max-width: 800px !important;
+    min-width: 800px !important;
+    margin: 20px auto !important;
+    padding: 20px !important;
+    background: white !important;
+    border: 1px solid #ddd !important;
+    border-radius: 8px !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+    z-index: 1 !important;
+    box-sizing: border-box !important;
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
+    transform: none !important;
+`;
+
+const TEXT_ONLY_CONTENT_STYLES = `
+    width: 100% !important;
+    max-width: none !important;
+    min-width: none !important;
+    margin: 0 !important;
+    padding: 15px !important;
+    border: none !important;
+    box-sizing: border-box !important;
+    position: relative !important;
+    float: none !important;
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
+    transform: none !important;
+`;
+
+const TEXT_ONLY_CONTAINER_STYLES = `
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+`;
+
+const TEXT_ONLY_BODY_STYLES = `
+    background: #f5f5f5 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow-y: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    min-height: 100vh !important;
+`;
+
+// Helper function to hide container with appropriate method for weave type
+function hideContainer(containerId, isAggressive = false) {
+    const container = document.getElementById(containerId);
+    if (container && !container.hasAttribute('data-rc-original-display')) {
+        container.setAttribute('data-rc-original-display', 
+            window.getComputedStyle(container).display);
+        
+        if (isAggressive) {
+            container.style.setProperty('display', 'none', 'important');
+            container.style.setProperty('visibility', 'hidden', 'important');
+            container.style.setProperty('position', 'absolute', 'important');
+            container.style.setProperty('left', '-9999px', 'important');
+            container.style.setProperty('top', '-9999px', 'important');
+        } else {
+            container.style.display = 'none';
+        }
+        container.setAttribute('data-rc-hidden', 'true');
+    }
+}
+
+// Helper function to restore container with appropriate method for weave type
+function restoreContainer(containerId, isAggressive = false) {
+    const container = document.getElementById(containerId);
+    if (container && container.hasAttribute('data-rc-hidden')) {
+        const originalDisplay = container.getAttribute('data-rc-original-display');
+        
+        if (isAggressive) {
+            container.style.removeProperty('display');
+            if (originalDisplay && originalDisplay !== 'none') {
+                container.style.display = originalDisplay;
+            }
+            container.style.removeProperty('visibility');
+            container.style.removeProperty('position');
+            container.style.removeProperty('left');
+            container.style.removeProperty('top');
+        } else {
+            if (originalDisplay) {
+                container.style.display = originalDisplay === 'none' ? '' : originalDisplay;
+            } else {
+                container.style.display = '';
+            }
+        }
+        
+        container.removeAttribute('data-rc-hidden');
+        container.removeAttribute('data-rc-original-display');
+    }
+}
+
 // Function to show text-only view using CSS
 function showTextOnlyView() {
     console.log('RC Tool Commenter: Switching to text-only view with CSS');
@@ -859,7 +971,7 @@ function showTextOnlyView() {
     document.body.classList.add('rc-text-only-mode');
     
     // Store original styles before making changes
-    const textTools = document.querySelectorAll('.tool-text, .tool-simpletext');
+    const textTools = document.querySelectorAll(TEXT_TOOLS_SELECTOR);
     console.log('RC Tool Commenter: Found', textTools.length, 'text tools to style');
     
     // Store the original container information for each tool
@@ -886,45 +998,12 @@ function showTextOnlyView() {
         }
         
         // Apply text-only styling to text tools
-        tool.style.cssText = `
-            display: block !important;
-            position: relative !important;
-            float: none !important;
-            width: 800px !important;
-            max-width: 800px !important;
-            min-width: 800px !important;
-            margin: 20px auto !important;
-            padding: 20px !important;
-            background: white !important;
-            border: 1px solid #ddd !important;
-            border-radius: 8px !important;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
-            z-index: 1 !important;
-            box-sizing: border-box !important;
-            left: auto !important;
-            right: auto !important;
-            top: auto !important;
-            transform: none !important;
-        `;
+        tool.style.cssText = TEXT_ONLY_TOOL_STYLES;
         tool.setAttribute('data-rc-text-styled', 'true'); // Mark for restoration
         
         // Also apply consistent styling to the tool content area
         if (toolContent) {
-            toolContent.style.cssText = `
-                width: 100% !important;
-                max-width: none !important;
-                min-width: none !important;
-                margin: 0 !important;
-                padding: 15px !important;
-                border: none !important;
-                box-sizing: border-box !important;
-                position: relative !important;
-                float: none !important;
-                left: auto !important;
-                right: auto !important;
-                top: auto !important;
-                transform: none !important;
-            `;
+            toolContent.style.cssText = TEXT_ONLY_CONTENT_STYLES;
         }
         
     });
@@ -965,29 +1044,14 @@ function showTextOnlyView() {
         console.log('RC Tool Commenter: Using weave-graphical logic');
         
         // Hide the main weave container to prevent layout interference
-        const weaveContainer = document.getElementById('container-weave');
-        if (weaveContainer && !weaveContainer.hasAttribute('data-rc-original-display')) {
-            weaveContainer.setAttribute('data-rc-original-display', 
-                window.getComputedStyle(weaveContainer).display);
-            weaveContainer.style.display = 'none';
-            weaveContainer.setAttribute('data-rc-hidden', 'true');
-        }
+        hideContainer('container-weave');
         
         // Create a new container for text-only view
         let textOnlyContainer = document.getElementById('rc-text-only-container');
         if (!textOnlyContainer) {
             textOnlyContainer = document.createElement('div');
             textOnlyContainer.id = 'rc-text-only-container';
-            textOnlyContainer.style.cssText = `
-                width: 100%;
-                max-width: 900px;
-                margin: 0 auto;
-                padding: 20px;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                gap: 20px;
-            `;
+            textOnlyContainer.style.cssText = TEXT_ONLY_CONTAINER_STYLES;
             document.body.appendChild(textOnlyContainer);
         }
         
@@ -1005,40 +1069,15 @@ function showTextOnlyView() {
         if (!textOnlyContainer) {
             textOnlyContainer = document.createElement('div');
             textOnlyContainer.id = 'rc-text-only-container';
-            textOnlyContainer.style.cssText = `
-                width: 100%;
-                max-width: 900px;
-                margin: 0 auto;
-                padding: 20px;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                gap: 20px;
-            `;
+            textOnlyContainer.style.cssText = TEXT_ONLY_CONTAINER_STYLES;
             document.body.appendChild(textOnlyContainer);
         }
         
         // Hide the main content container to get rid of grid structure
-        const contentContainer = document.getElementById('content');
-        if (contentContainer && !contentContainer.hasAttribute('data-rc-original-display')) {
-            contentContainer.setAttribute('data-rc-original-display', 
-                window.getComputedStyle(contentContainer).display);
-            contentContainer.style.display = 'none';
-            contentContainer.setAttribute('data-rc-hidden', 'true');
-        }
+        hideContainer('content');
         
         // Also hide the container-weave if it exists (some weave-block pages have both)
-        const weaveContainer = document.getElementById('container-weave');
-        if (weaveContainer && !weaveContainer.hasAttribute('data-rc-original-display')) {
-            weaveContainer.setAttribute('data-rc-original-display', 
-                window.getComputedStyle(weaveContainer).display);
-            weaveContainer.style.setProperty('display', 'none', 'important');
-            weaveContainer.style.setProperty('visibility', 'hidden', 'important');
-            weaveContainer.style.setProperty('position', 'absolute', 'important');
-            weaveContainer.style.setProperty('left', '-9999px', 'important');
-            weaveContainer.style.setProperty('top', '-9999px', 'important');
-            weaveContainer.setAttribute('data-rc-hidden', 'true');
-        }
+        hideContainer('container-weave', true); // Use aggressive hiding for weave-block
         
         // Move text tools to the new container
         textTools.forEach((tool, index) => {
@@ -1051,17 +1090,7 @@ function showTextOnlyView() {
     }
     
     // Style the body for text-only mode with proper centering
-    document.body.style.cssText = `
-        background: #f5f5f5 !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        overflow-y: auto !important;
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: center !important;
-        justify-content: flex-start !important;
-        min-height: 100vh !important;
-    `;
+    document.body.style.cssText = TEXT_ONLY_BODY_STYLES;
     document.body.setAttribute('data-rc-body-styled', 'true'); // Mark for restoration
 }
 
@@ -1087,22 +1116,12 @@ function showNormalView() {
         console.log('RC Tool Commenter: Using weave-graphical restoration logic');
         
         // First, restore the weave container before moving tools back
-        const weaveContainer = document.getElementById('container-weave');
-        if (weaveContainer && weaveContainer.hasAttribute('data-rc-hidden')) {
-            const originalDisplay = weaveContainer.getAttribute('data-rc-original-display');
-            if (originalDisplay) {
-                weaveContainer.style.display = originalDisplay === 'none' ? '' : originalDisplay;
-            } else {
-                weaveContainer.style.display = '';
-            }
-            weaveContainer.removeAttribute('data-rc-hidden');
-            weaveContainer.removeAttribute('data-rc-original-display');
-        }
+        restoreContainer('container-weave');
         
         // Then, move text tools back to their original containers
         const textOnlyContainer = document.getElementById('rc-text-only-container');
         if (textOnlyContainer) {
-            const textTools = textOnlyContainer.querySelectorAll('.tool-text, .tool-simpletext');
+            const textTools = textOnlyContainer.querySelectorAll(TEXT_TOOLS_SELECTOR);
             
             // Find the original weave container
             const weave = document.getElementById('weave');
@@ -1122,7 +1141,7 @@ function showNormalView() {
         // For weave-block, move tools back to their original containers before restoring styles
         const textOnlyContainer = document.getElementById('rc-text-only-container');
         if (textOnlyContainer) {
-            const textTools = textOnlyContainer.querySelectorAll('.tool-text, .tool-simpletext');
+            const textTools = textOnlyContainer.querySelectorAll(TEXT_TOOLS_SELECTOR);
             
             // Move tools back to their original parents
             textTools.forEach(tool => {
@@ -1136,35 +1155,10 @@ function showNormalView() {
         }
         
         // Restore the content container
-        const contentContainer = document.getElementById('content');
-        if (contentContainer && contentContainer.hasAttribute('data-rc-hidden')) {
-            const originalDisplay = contentContainer.getAttribute('data-rc-original-display');
-            if (originalDisplay) {
-                contentContainer.style.display = originalDisplay === 'none' ? '' : originalDisplay;
-            } else {
-                contentContainer.style.display = '';
-            }
-            contentContainer.removeAttribute('data-rc-hidden');
-            contentContainer.removeAttribute('data-rc-original-display');
-        }
+        restoreContainer('content');
         
         // Also restore the weave container if it was hidden
-        const weaveContainer = document.getElementById('container-weave');
-        if (weaveContainer && weaveContainer.hasAttribute('data-rc-hidden')) {
-            const originalDisplay = weaveContainer.getAttribute('data-rc-original-display');
-            // Restore display property
-            weaveContainer.style.removeProperty('display');
-            if (originalDisplay && originalDisplay !== 'none') {
-                weaveContainer.style.display = originalDisplay;
-            }
-            // Remove all the hiding properties
-            weaveContainer.style.removeProperty('visibility');
-            weaveContainer.style.removeProperty('position');
-            weaveContainer.style.removeProperty('left');
-            weaveContainer.style.removeProperty('top');
-            weaveContainer.removeAttribute('data-rc-hidden');
-            weaveContainer.removeAttribute('data-rc-original-display');
-        }
+        restoreContainer('container-weave', true); // Use aggressive restoration for weave-block
         
     } else {
         console.log('RC Tool Commenter: Using fallback restoration logic');
@@ -1175,9 +1169,11 @@ function showNormalView() {
     
     // Restore hidden elements using stored original display values
     const hiddenElements = document.querySelectorAll('[data-rc-hidden="true"]');
+    const handledContainerIds = new Set(['container-weave', 'content']); // Track containers we already handled
+    
     hiddenElements.forEach(element => {
-        // Skip weave container as we may have already handled it above
-        if (!element.id || element.id !== 'container-weave') {
+        // Skip containers that were already handled in weave-specific sections
+        if (!element.id || !handledContainerIds.has(element.id)) {
             const originalDisplay = element.getAttribute('data-rc-original-display');
             if (originalDisplay) {
                 element.style.display = originalDisplay === 'none' ? '' : originalDisplay;
