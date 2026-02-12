@@ -1699,6 +1699,120 @@ async function saveSuggestion(tool, selection, suggestionText) {
     
     console.log('Saved suggestion with span ID:', suggestion);
     
+    // **NEW: Apply suggestion to the actual tool via RC API**
+    console.log('🚀 Applying suggestion to RC tool...');
+    
+    try {
+        // Get current tool data to access htmlSpan content
+        const bodyElement = document.body;
+        const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
+        const storageKey = `rc_exposition_${expositionId}`;
+        const result = await browser.storage.local.get(storageKey);
+        const expositionData = result[storageKey];
+        
+        if (expositionData && expositionData.weaves && expositionData.weaves[weaveId]) {
+            const weaveData = expositionData.weaves[weaveId];
+            const toolData = weaveData.tools.find(t => t.id === toolId);
+            
+            if (toolData && toolData.content && toolData.content.htmlSpan) {
+                // Get the current DOM content which includes the newly added span
+                const toolElement = document.querySelector(`[data-id="${toolId}"]`);
+                if (toolElement) {
+                    const textContentElement = toolElement.querySelector('.html-text-editor-content');
+                    if (textContentElement) {
+                        // Use current DOM content which includes all spans (existing + new)
+                        const enhancedContent = textContentElement.innerHTML;
+                        
+                        console.log('📤 Updating RC tool with enhanced content...');
+                        console.log('📝 Enhanced content preview:', enhancedContent.substring(0, 200));
+                        console.log(`📊 Content length: ${enhancedContent.length} chars`);
+                        
+                        // Apply the enhanced content to the actual tool via RC's API
+                        // Use script injection to execute the function in page scope
+                const executeScript = document.createElement('script');
+                executeScript.textContent = `
+                    (async function() {
+                        try {
+                            if (typeof window.applyRCToolUpdate === 'function') {
+                                console.log('📞 Calling applyRCToolUpdate from page scope...');
+                                const result = await window.applyRCToolUpdate('${toolId}', \`${enhancedContent.replace(/`/g, '\\`')}\`, '${expositionId}');
+                                
+                                if (result.success) {
+                                    console.log('✅ Successfully applied suggestion to RC tool!');
+                                    // Trigger a custom event to notify the content script
+                                    window.dispatchEvent(new CustomEvent('rcToolUpdateSuccess', { 
+                                        detail: { toolId: '${toolId}', success: true } 
+                                    }));
+                                } else {
+                                    console.error('❌ Failed to apply suggestion to RC tool:', result.error);
+                                    window.dispatchEvent(new CustomEvent('rcToolUpdateError', { 
+                                        detail: { toolId: '${toolId}', error: result.error } 
+                                    }));
+                                }
+                            } else {
+                                console.warn('⚠ applyRCToolUpdate function not available in page scope');
+                                window.dispatchEvent(new CustomEvent('rcToolUpdateError', { 
+                                    detail: { toolId: '${toolId}', error: 'Function not available' } 
+                                }));
+                            }
+                        } catch (error) {
+                            console.error('❌ Error in injected script:', error);
+                            window.dispatchEvent(new CustomEvent('rcToolUpdateError', { 
+                                detail: { toolId: '${toolId}', error: error.message } 
+                            }));
+                        }
+                    })();
+                `;
+                document.head.appendChild(executeScript);
+                
+                // Listen for the result
+                const handleSuccess = (event) => {
+                    if (event.detail.toolId === toolId) {
+                        showNotification(`✅ Suggestion applied to tool ${toolId}!`);
+                        window.removeEventListener('rcToolUpdateSuccess', handleSuccess);
+                        window.removeEventListener('rcToolUpdateError', handleError);
+                        document.head.removeChild(executeScript);
+                    }
+                };
+                
+                const handleError = (event) => {
+                    if (event.detail.toolId === toolId) {
+                        showNotification(`❌ Failed to apply suggestion: ${event.detail.error}`);
+                        window.removeEventListener('rcToolUpdateSuccess', handleSuccess);
+                        window.removeEventListener('rcToolUpdateError', handleError);
+                        document.head.removeChild(executeScript);
+                    }
+                };
+                
+                window.addEventListener('rcToolUpdateSuccess', handleSuccess);
+                window.addEventListener('rcToolUpdateError', handleError);
+                
+                // Cleanup after timeout
+                setTimeout(() => {
+                    window.removeEventListener('rcToolUpdateSuccess', handleSuccess);
+                    window.removeEventListener('rcToolUpdateError', handleError);
+                    if (document.head.contains(executeScript)) {
+                        document.head.removeChild(executeScript);
+                    }
+                }, 10000); // 10 second timeout
+                    } else {
+                        console.warn('⚠ No text content element found for tool');
+                        showNotification('⚠ Suggestion saved but could not find tool content');
+                    }
+                } else {
+                    console.warn('⚠ No tool element found for tool ID');
+                    showNotification('⚠ Suggestion saved but could not find tool element');
+                }
+            } else {
+                console.warn('⚠ No htmlSpan content found for tool');
+                showNotification('⚠ Suggestion saved but no enhanced content to apply');
+            }
+        }
+    } catch (error) {
+        console.error('❌ Error applying suggestion to RC tool:', error);
+        showNotification(`❌ Error applying suggestion: ${error.message}`);
+    }
+    
     // Update tool's stored data to include suggestion count
     await updateToolWithSuggestionCount(tool);
     
@@ -2225,7 +2339,7 @@ async function restoreSuggestionBadges(tools) {
     console.log('RC Tool Commenter: Restoring badges and highlights for suggestions:', Object.keys(suggestions));
     
     // Add badges to tools that have suggestions and restore visual highlights
-    tools.forEach(tool => {
+    for (const tool of tools) {
         const toolId = tool.dataset.id;
         
         if (toolId && suggestions[toolId] && suggestions[toolId].length > 0) {
@@ -2235,13 +2349,13 @@ async function restoreSuggestionBadges(tools) {
             addSuggestionBadge(tool, suggestionCount);
             
             // Restore htmlSpan content for this tool
-            restoreToolHtmlSpan(tool, toolId, expositionData, weaveId);
+            await restoreToolHtmlSpan(tool, toolId, expositionData, weaveId);
         }
-    });
+    }
 }
 
 // Function to restore htmlSpan content for a tool
-function restoreToolHtmlSpan(tool, toolId, expositionData, weaveId) {
+async function restoreToolHtmlSpan(tool, toolId, expositionData, weaveId) {
     try {
         console.log(`🔧 Restoring spans for tool ${toolId}`);
         
@@ -2272,8 +2386,39 @@ function restoreToolHtmlSpan(tool, toolId, expositionData, weaveId) {
         console.log(`🔧 Tool ${toolId}: hasSpans=${hasSpans}, htmlSpanDifferent=${htmlSpanDifferent}`);
         console.log(`📊 Tool ${toolId} data: html=${toolData.content.html?.length}chars, htmlSpan=${toolData.content.htmlSpan?.length}chars`);
         
-        // Restore spans if DOM doesn't have them but storage does
-        if (!hasSpans && htmlSpanDifferent && toolData.content.htmlSpan) {
+        // Case 1: DOM has spans but stored data might be outdated - sync storage with DOM
+        if (hasSpans) {
+            const currentDOMContent = textContent.innerHTML;
+            if (toolData.content.htmlSpan !== currentDOMContent) {
+                console.log(`🔄 Tool ${toolId}: Syncing stored data with DOM (spans detected in DOM)`);
+                console.log(`📝 Updating htmlSpan: ${toolData.content.htmlSpan?.length || 0} → ${currentDOMContent.length} chars`);
+                
+                // Update stored data to match current DOM
+                toolData.content.htmlSpan = currentDOMContent;
+                
+                // Re-store the updated data
+                const bodyElement = document.body;
+                const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
+                const weaveId = bodyElement.dataset.weave || extractFromUrl('weave') || 'unknown';
+                const storageKey = `rc_exposition_${expositionId}`;
+                
+                const result = await browser.storage.local.get(storageKey);
+                if (result[storageKey] && result[storageKey].weaves && result[storageKey].weaves[weaveId]) {
+                    const weaveData = result[storageKey].weaves[weaveId];
+                    const storedTool = weaveData.tools.find(t => t.id === toolId);
+                    if (storedTool) {
+                        storedTool.content.htmlSpan = currentDOMContent;
+                        await browser.storage.local.set({ [storageKey]: result[storageKey] });
+                        console.log(`✅ Tool ${toolId}: Storage synchronized with DOM content`);
+                    }
+                }
+            }
+            
+            // Add click handlers to existing spans
+            addClickHandlersToRestoredSpans(textContent, toolId);
+        }
+        // Case 2: DOM doesn't have spans but storage does - restore from storage
+        else if (!hasSpans && htmlSpanDifferent && toolData.content.htmlSpan) {
             textContent.innerHTML = toolData.content.htmlSpan;
             console.log(`✅ Restored spans for tool ${toolId} from storage`);
             
@@ -2807,6 +2952,10 @@ async function initializeExtension() {
     
     console.log('RC Tool Commenter: Initializing on exposition page');
     
+    // Debug: Log the extracted IDs
+    console.log(`🔍 Detected exposition ID: ${expositionId}, weave ID: ${weaveId}`);
+    console.log(`🌐 Current URL: ${window.location.href}`);
+    
     // Reset storage flag for new weave
     toolsStoredForCurrentWeave = false;
     suggestionBadgesRestored = false; // Reset badge restoration flag for new weave
@@ -2870,6 +3019,271 @@ async function initializeExtension() {
         childList: true,
         subtree: true
     });
+    
+    // **INJECT RC TOOL UPDATE FUNCTIONS IMMEDIATELY**
+    // Small delay to ensure DOM is ready for script injection
+    setTimeout(() => {
+        injectRCToolUpdateFunctions();
+        
+        // Verify injection worked by checking the script element was added
+        setTimeout(() => {
+            const injectedScript = document.querySelector('script[data-rc-functions-injected]');
+            if (injectedScript) {
+                console.log('✅ RC Tool Update functions successfully injected and available');
+            } else {
+                console.warn('⚠ RC Tool Update functions injection may have failed - retrying...');
+                injectRCToolUpdateFunctions();
+            }
+        }, 500);
+    }, 100);
+}
+
+// FUNCTION INJECTION FOR RC TOOL UPDATES
+function injectRCToolUpdateFunctions() {
+    try {
+        // Ensure functions are available globally for testing
+        window.RCToolUpdater = {
+            updateToolContent: updateToolContent,
+            applySuggestionToTool: applySuggestionToTool,
+            testApplySuggestion: testApplySuggestion,
+            escapeHtml: escapeHtml
+        };
+        
+        // Also assign individually 
+        window.updateToolContent = updateToolContent;
+        window.applySuggestionToTool = applySuggestionToTool;
+        window.testApplySuggestion = testApplySuggestion;
+        
+        // Test function
+        window.checkRCFunctions = function() {
+            console.log('RC Functions Status:', {
+                updateToolContent: typeof window.updateToolContent,
+                applySuggestionToTool: typeof window.applySuggestionToTool,
+                testApplySuggestion: typeof window.testApplySuggestion,
+                RCToolUpdater: typeof window.RCToolUpdater,
+                applyRCToolUpdate: typeof window.applyRCToolUpdate,
+                testRCToolUpdate: typeof window.testRCToolUpdate,
+                script_loaded: true
+            });
+            return window.RCToolUpdater;
+        };
+        
+        // Add functions to the page's actual global scope (not content script scope)
+        const script = document.createElement('script');
+        script.setAttribute('data-rc-functions-injected', 'true');
+        script.textContent = `
+            // Define test function directly in page scope
+            window.testRCToolUpdate = async function(toolId, originalText, suggestionText) {
+                // Extract research ID from current URL - works for both view and editor pages
+                const urlParams = new URLSearchParams(window.location.search);
+                let researchId = urlParams.get('research');
+                
+                // If not in URL params, try extracting from path (for view pages like /view/1731661/1732783)
+                if (!researchId) {
+                    const pathMatch = window.location.pathname.match(/\\/view\\/(\\d+)/);
+                    if (pathMatch) {
+                        researchId = pathMatch[1];
+                    }
+                }
+                
+                // Last resort: try body dataset
+                if (!researchId) {
+                    researchId = document.body.dataset.research;
+                }
+                
+                if (!researchId) {
+                    console.error('❌ Could not find research ID. Current URL:', window.location.href);
+                    console.log('💡 You might need to be on the editor page: /editor?research=1731661&weave=1732783');
+                    return false;
+                }
+                
+                console.log('🧪 Testing RC tool update:', { toolId, originalText, suggestionText, researchId });
+                console.log('📍 Current page:', window.location.href);
+                console.log('🔍 Research ID extraction method:', researchId ? 'success' : 'failed');
+                
+                try {
+                    // Get current tool content
+                    const editResponse = await fetch('/item/edit?item=' + toolId + '&research=' + researchId, {
+                        method: 'GET',
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    });
+                    
+                    if (!editResponse.ok) {
+                        throw new Error('Failed to fetch tool data: ' + editResponse.status);
+                    }
+                    
+                    const editHtml = await editResponse.text();
+                    console.log('✓ Successfully fetched tool edit form');
+                    
+                    // Parse the form
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(editHtml, 'text/html');
+                    const contentTextarea = doc.querySelector('#frm-media-textcontent');
+                    
+                    if (!contentTextarea) {
+                        throw new Error('Could not find content textarea');
+                    }
+                    
+                    let currentContent = contentTextarea.value;
+                    console.log('📝 Current content preview:', currentContent.substring(0, 200));
+                    
+                    // Create enhanced content
+                    const escapeHtml = (text) => {
+                        const div = document.createElement('div');
+                        div.textContent = text;
+                        return div.innerHTML;
+                    };
+                    
+                    const suggestionSpan = '<span class="ai-suggestion" data-original="' + escapeHtml(originalText) + '" data-suggestion="' + escapeHtml(suggestionText) + '" title="AI Suggestion: ' + escapeHtml(suggestionText) + '">' + suggestionText + '</span>';
+                    const enhancedContent = currentContent.replace(originalText, suggestionSpan);
+                    
+                    if (enhancedContent === currentContent) {
+                        console.warn('⚠ No text was replaced - original text not found');
+                        return false;
+                    }
+                    
+                    console.log('🔄 Enhanced content preview:', enhancedContent.substring(0, 200));
+                    console.log('✅ Test completed successfully! Ready to apply changes.');
+                    console.log('📌 To actually apply: Use this enhanced content in updateToolContent()');
+                    
+                    return {
+                        success: true,
+                        originalContent: currentContent,
+                        enhancedContent: enhancedContent,
+                        toolId: toolId,
+                        researchId: researchId
+                    };
+                    
+                } catch (error) {
+                    console.error('✗ Error in test:', error);
+                    return { success: false, error: error.message };
+                }
+            };
+            
+            // Function to actually apply the changes
+            window.applyRCToolUpdate = async function(toolId, enhancedContent, researchId) {
+                console.log('🚀 Applying update to tool', toolId);
+                
+                try {
+                    // Get the current form data first
+                    const editResponse = await fetch('/item/edit?item=' + toolId + '&research=' + researchId, {
+                        method: 'GET',
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    });
+                    
+                    if (!editResponse.ok) {
+                        throw new Error('Failed to fetch tool data: ' + editResponse.status);
+                    }
+                    
+                    const editHtml = await editResponse.text();
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(editHtml, 'text/html');
+                    
+                    // Detect weave type based on current content format
+                    const currentTextarea = doc.querySelector('textarea[name="media[textcontent]"]');
+                    const currentContent = currentTextarea ? currentTextarea.value : '';
+                    
+                    // Check if current content is full HTML document (block weave) or simple content (graphical weave)
+                    const isBlockWeave = currentContent.includes('<!DOCTYPE') || currentContent.includes('<html>');
+                    
+                    // Format the enhanced content based on weave type
+                    let formattedContent;
+                    if (isBlockWeave) {
+                        // Block weave: wrap in full HTML document structure
+                        formattedContent = '<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN" "http://www.w3.org/TR/REC-html40/loose.dtd">\n<html><body>' + enhancedContent + '</body></html>';
+                    } else {
+                        // Graphical weave: use simple paragraph format
+                        formattedContent = enhancedContent;
+                    }
+                    
+                    console.log('🔍 Weave type detected:', isBlockWeave ? 'Block' : 'Graphical');
+                    console.log('📝 Content format:', isBlockWeave ? 'Full HTML document' : 'Simple paragraphs');
+                    
+                    // Build form data exactly like RC expects
+                    const formData = new URLSearchParams();
+                    
+                    // Common fields
+                    const titleInput = doc.querySelector('#frm-common-title');
+                    if (titleInput) {
+                        formData.append('common[title]', titleInput.value);
+                    }
+                    
+                    // Updated content with proper formatting
+                    formData.append('media[textcontent]', formattedContent);
+                    
+                    // Style fields (preserve existing styling)
+                    const styleFields = [
+                        'paddingleft', 'paddingtop', 'paddingright', 'paddingbottom',
+                        'borderstyle', 'borderwidth', 'bordercolor', 'borderradius',
+                        'backgroundcolor', 'backgroundimagefileid', 'backgroundimagestyle',
+                        'backgroundimageposition', 'backgroundimagesize',
+                        'shadowmarginleft', 'shadowmargintop', 'shadowunschaerfe', 'shadowcolor',
+                        'cssclasses'
+                    ];
+                    
+                    styleFields.forEach(field => {
+                        const input = doc.querySelector('#frm-style-' + field);
+                        if (input) {
+                            formData.append('style[' + field + ']', input.value || '');
+                        } else {
+                            // Set defaults for missing fields
+                            const defaults = {
+                                'borderstyle': 'none',
+                                'backgroundimagestyle': 'repeat',
+                                'backgroundimageposition': 'left top',
+                                'backgroundimagesize': 'auto'
+                            };
+                            formData.append('style[' + field + ']', defaults[field] || '');
+                        }
+                    });
+                    
+                    // Submit button
+                    formData.append('submitbutton', 'submitbutton');
+                    
+                    console.log('📤 Sending update request...');
+                    
+                    // Send the update
+                    const updateResponse = await fetch('/item/edit?item=' + toolId + '&research=' + researchId, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: formData.toString()
+                    });
+                    
+                    if (!updateResponse.ok) {
+                        throw new Error('Failed to update tool: ' + updateResponse.status);
+                    }
+                    
+                    // Check if update was successful
+                    const hasValidationHeader = updateResponse.headers.get('Form-Validation');
+                    if (hasValidationHeader === '1') {
+                        console.log('✅ Tool updated successfully!');
+                        console.log('🔄 Reloading page to show changes...');
+                        setTimeout(() => window.location.reload(), 1000);
+                        return { success: true };
+                    } else {
+                        throw new Error('Update validation failed');
+                    }
+                    
+                } catch (error) {
+                    console.error('❌ Error applying update:', error);
+                    return { success: false, error: error.message };
+                }
+            };
+            
+            console.log('🚀 testRCToolUpdate() and applyRCToolUpdate() functions are now available!');
+            console.log('🔧 Functions injected at:', new Date().toLocaleTimeString());
+        `;
+        document.head.appendChild(script);
+        
+        console.log('✅ RC Tool Commenter: Functions forcibly assigned to global scope');
+        console.log('✅ Use window.checkRCFunctions() to verify or window.RCToolUpdater to access functions');
+        
+    } catch (error) {
+        console.error('❌ Failed to assign functions to global scope:', error);
+    }
 }
 
 // Wait for page to load and initialize
@@ -2880,3 +3294,4 @@ if (document.readyState === 'loading') {
 }
 
 // Note: Removed duplicate timeout initialization - the isInitialized guard handles this
+// RC tool update functions are now injected immediately during initializeExtension()
