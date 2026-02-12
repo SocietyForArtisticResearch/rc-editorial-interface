@@ -2556,6 +2556,221 @@ async function deleteSuggestion(suggestionId, tool) {
     }
 }
 
+// ========================================
+// PROGRAMMATIC TOOL UPDATE FUNCTIONALITY
+// ========================================
+
+/**
+ * Updates a tool's content via RC's API
+ */
+async function updateToolContent(toolId, newContent, researchId) {
+    try {
+        // First, get current tool data
+        const editResponse = await fetch(`/item/edit?item=${toolId}&research=${researchId}`, {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        
+        if (!editResponse.ok) {
+            throw new Error(`Failed to fetch tool data: ${editResponse.status}`);
+        }
+        
+        const editHtml = await editResponse.text();
+        
+        // Parse current form data from the edit form
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(editHtml, 'text/html');
+        
+        // Extract current form values
+        const formData = new URLSearchParams();
+        
+        // Common fields
+        const titleInput = doc.querySelector('#frm-common-title');
+        if (titleInput) {
+            formData.append('common[title]', titleInput.value);
+        }
+        
+        // Update the text content with our new content
+        formData.append('media[textcontent]', newContent);
+        
+        // Style fields (preserve existing styling)
+        const styleFields = [
+            'paddingleft', 'paddingtop', 'paddingright', 'paddingbottom',
+            'borderstyle', 'borderwidth', 'bordercolor', 'borderradius',
+            'backgroundcolor', 'backgroundimagefileid', 'backgroundimagestyle',
+            'backgroundimageposition', 'backgroundimagesize',
+            'shadowmarginleft', 'shadowmargintop', 'shadowunschaerfe', 'shadowcolor',
+            'cssclasses'
+        ];
+        
+        styleFields.forEach(field => {
+            const input = doc.querySelector(`#frm-style-${field}`);
+            if (input) {
+                formData.append(`style[${field}]`, input.value || '');
+            } else {
+                // Set defaults for missing fields based on HAR analysis
+                const defaults = {
+                    'borderstyle': 'none',
+                    'backgroundimagestyle': 'repeat',
+                    'backgroundimageposition': 'left top',
+                    'backgroundimagesize': 'auto'
+                };
+                formData.append(`style[${field}]`, defaults[field] || '');
+            }
+        });
+        
+        // Submit button
+        formData.append('submitbutton', 'submitbutton');
+        
+        // Send the update request
+        const updateResponse = await fetch(`/item/edit?item=${toolId}&research=${researchId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: formData.toString()
+        });
+        
+        if (!updateResponse.ok) {
+            throw new Error(`Failed to update tool: ${updateResponse.status}`);
+        }
+        
+        // Verify the update was successful by checking the response
+        const responseText = await updateResponse.text();
+        const hasValidationHeader = updateResponse.headers.get('Form-Validation');
+        
+        if (hasValidationHeader === '1') {
+            console.log(`✓ Successfully updated tool ${toolId}`);
+            return true;
+        } else {
+            throw new Error('Update validation failed');
+        }
+        
+    } catch (error) {
+        console.error('✗ Error updating tool content:', error);
+        return false;
+    }
+}
+
+/**
+ * Applies a suggestion span to tool content and updates the tool
+ */
+async function applySuggestionToTool(toolId, originalText, suggestionText, researchId) {
+    try {
+        // Get current research ID if not provided
+        if (!researchId) {
+            const urlParams = new URLSearchParams(window.location.search);
+            researchId = urlParams.get('research');
+        }
+        
+        // Get current tool content
+        const editResponse = await fetch(`/item/edit?item=${toolId}&research=${researchId}`, {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        
+        if (!editResponse.ok) {
+            throw new Error(`Failed to fetch tool data: ${editResponse.status}`);
+        }
+        
+        const editHtml = await editResponse.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(editHtml, 'text/html');
+        
+        // Extract current content
+        const contentTextarea = doc.querySelector('#frm-media-textcontent');
+        if (!contentTextarea) {
+            throw new Error('Could not find content textarea');
+        }
+        
+        let currentContent = contentTextarea.value;
+        
+        // Create enhanced HTML: original content with suggestion span
+        // The suggestion span contains the suggested text, with original text stored in data attributes
+        const suggestionSpan = `<span class="ai-suggestion" data-original="${escapeHtml(originalText)}" data-suggestion="${escapeHtml(suggestionText)}" title="AI Suggestion: ${escapeHtml(suggestionText)}">${suggestionText}</span>`;
+        
+        // Replace the original text with the enhanced HTML (original content + suggestion span)
+        const enhancedContent = currentContent.replace(originalText, suggestionSpan);
+        
+        if (enhancedContent === currentContent) {
+            console.warn('⚠ No text was replaced - original text not found in tool content');
+            console.log('Current content preview:', currentContent.substring(0, 200));
+            console.log('Looking for text:', originalText);
+            return false;
+        }
+        
+        console.log('📝 Original content preview:', currentContent.substring(0, 200));
+        console.log('🔄 Enhanced content preview:', enhancedContent.substring(0, 200));
+        
+        // Update the tool with the enhanced content (original + suggestion span)
+        console.log(`🔄 Applying suggestion enhancement to tool ${toolId}...`);
+        const success = await updateToolContent(toolId, enhancedContent, researchId);
+        
+        if (success) {
+            console.log(`✓ Successfully applied suggestion to tool ${toolId}`);
+            // Trigger a page refresh to show the changes
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        }
+        
+        return success;
+        
+    } catch (error) {
+        console.error('✗ Error applying suggestion to tool:', error);
+        return false;
+    }
+}
+
+/**
+ * Helper function to escape HTML
+ */
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+/**
+ * Test function to apply a suggestion to a tool (for testing purposes)
+ */
+async function testApplySuggestion(toolId, originalText, suggestionText) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const researchId = urlParams.get('research');
+    
+    if (!researchId) {
+        console.error('Could not find research ID in URL');
+        return false;
+    }
+    
+    console.log('Testing suggestion application:', { toolId, originalText, suggestionText, researchId });
+    
+    return await applySuggestionToTool(toolId, originalText, suggestionText, researchId);
+}
+
+// Make functions available globally for testing (immediate assignment)
+window.updateToolContent = updateToolContent;
+window.applySuggestionToTool = applySuggestionToTool;
+window.testApplySuggestion = testApplySuggestion;
+
+// Debug function to check function availability
+window.checkRCFunctions = function() {
+    console.log('RC Functions Status:', {
+        updateToolContent: typeof window.updateToolContent,
+        applySuggestionToTool: typeof window.applySuggestionToTool,
+        testApplySuggestion: typeof window.testApplySuggestion,
+        script_loaded: true
+    });
+    return 'Functions loaded!';
+};
+
+console.log('RC Tool Commenter: Functions assigned to window object');
+
 // Function to initialize the extension
 async function initializeExtension() {
     if (isInitialized) {

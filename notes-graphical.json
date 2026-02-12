@@ -1,0 +1,294 @@
+{
+  "exposition": {
+    "id": "2908423",
+    "exportTimestamp": "2026-02-11T20:26:43.553Z",
+    "totalWeaves": 1,
+    "totalTools": 6,
+    "totalSuggestions": 4
+  },
+  "weaves": {
+    "2908424": {
+      "weaveId": "2908424",
+      "url": "https://www.researchcatalogue.net/view/2908423/2908424",
+      "tools": [
+        {
+          "id": "2908471",
+          "type": "text",
+          "title": "",
+          "className": "tool tool-text  scrollbar-auto",
+          "expositionId": "2908423",
+          "weaveId": "2908424",
+          "url": "https://www.researchcatalogue.net/view/2908423/2908424",
+          "timestamp": "2026-02-11T20:26:34.333Z",
+          "content": {
+            "plainText": "This page [in progress] collects materials related to simularr artistic research residency in Palazzo Russo, San Cesario di Lecce, March-April 2024.",
+            "html": "<p style=\"text-align: left;\">&nbsp;<span style=\"font-size: 10pt;line-height: 1.25em;\"><span style=\"font-family: courier prime, monospace;\">&nbsp; This page <span style=\"background-color: #ffff00;\">[in progress]</span> collects materials related to <em>simularr</em> artistic research residency in Palazzo Russo, San Cesario di Lecce, March-April 2024.</span><strong><span style=\"font-family: courier prime, monospace;\"><br></span></strong></span></p>",
+            "htmlSpan": "<p style=\"text-align: left;\">&nbsp;<span style=\"font-size: 10pt;line-height: 1.25em;\"><span style=\"font-family: courier prime, monospace;\">&nbsp; This page <span style=\"background-color: #ffff00;\">[in progress]</span> collects materials related to <em>simularr</em> arti<span id=\"rc-suggestion-2908471-1770841594325\" class=\"rc-suggestion-highlight\" data-suggestion=\"yes\" data-selected-text=\"stic research residency in Palazzo Russo,\">stic research residency in Palazzo Russo, </span>San Cesario di Lecce, March-April 2024.</span><strong><span style=\"font-family: courier prime, monospace;\"><br></span></strong></span></p>"
+          },
+          "position": {
+            "x": 18.51666259765625,
+            "y": 229.61666870117188,
+            "width": 119.98333740234375,
+            "height": 412.7833251953125
+          },
+          "dataAttributes": {
+            "data-id": "2908471",
+            "data-source": "2907230",
+            "data-locked": "0",
+            "data-editable": "1",
+            "data-tool": "text",
+            "data-title": "",
+            "data-date": "",
+            "data-options": "[]",
+            "data-rotate": "-1.54",
+            "data-popover": "",
+            "data-popover-options": "[]",
+            "data-rc-tool-enhanced": "true"
+          },
+          "suggestions": [
+            {
+              "id": "suggestion_1770841594326",
+              "toolId": "2908471",
+              "expositionId": "2908423",
+              "weaveId": "2908424",
+              "spanId": "rc-suggestion-2908471-1770841594325",
+              "selectedText": "stic research residency in Palazzo Russo,",
+              "suggestion": "yes",
+              "timestamp": "2026-02-11T20:26:34.326Z",
+              "url": "https://www.researchcatalogue.net/view/2908423/2908424",
+              "toolType": "text"
+            }
+          ],
+          "suggestionCount": 1
+        },
+        {
+          "id": "2908560",
+          "type": "text",
+          "title": "",
+          "className": "tool tool-text  scrollbar-auto",
+          "expositionId": "2908423",
+          "weaveId": "2908424",
+          "url": "https://www.researchcatalogue.net/view/2908423/2908424",
+          "timestamp": "2026-02-11T20:26:34.334Z",
+          "content": {
+            "plainText": "Pictures - March 26th to April 6th 2024",
+            "html": "<p style=\"text-align: left;\"><span style=\"font-size: 13pt;line-height: 1.25em;\"><span style=\"font-family: courier prime, monospace;\">Pictures - March 26th to April 6th 2024</span><strong><span style=\"font-family: courier prime, monospace;\"><br></span></strong></span></p>",
+            "htmlSpan": "<p style=\"text-align: left;\"><span style=\"font-size: 13pt;line-height: 1.25em;\"><span style=\"font-family: courier prime, monospace;\">Pictures - March 26th to<span id=\"rc-suggestion-2908560-1770841574546\" class=\"rc-suggestion-highlight\" data-suggestion=\"text\" data-selected-text=\"April 6th 2024\"> April 6th 2024</span></span><strong><span style=\"font-family: courier prime, monospace;\"><br></span></strong></span></p>"
+          },
+          "position": {
+            "x": 168,
+            "y": 2131,
+            "width": 483,
+            "height": 25
+          },
+          "dataAttributes": {
+            "data-id": "2908560",
+            "data-source": "2907227",
+            "data-locked": "0",
+            "data-editable": "1",
+            "data-tool": "text",
+            "data-title": "",
+            "data-date": "",
+            "data-options": "[]",
+            "data-rotate": "0",
+            "data-popover": "",
+            "data-popover-options": "[]",
+            "data-rc-tool-enhanced": "true"
+          },
+          "suggestions": [
+            {
+              "id": "suggestion_1770841574547",
+              "toolId": "2908560",
+              "expositionId": "2908423",
+              "weaveId": "2908424",
+              "spanId": "rc-suggestion-2908560-1770841574546",
+              "selectedText": "April 6th 2024",
+              "suggestion": "text",
+              "timestamp": "2026-02-11T20:26:14.547Z",
+              "url": "https://www.researchcatalogue.net/view/2908423/2908424",
+              "toolType": "text"
+            }
+          ],
+          "suggestionCount": 1
+        },
+        {
+          "id": "2908525",
+          "type": "text",
+          "title": "",
+          "className": "tool tool-text  scrollbar-auto",
+          "expositionId": "2908423",
+          "weaveId": "2908424",
+          "url": "https://www.researchcatalogue.net/view/2908423/2908424",
+          "timestamp": "2026-02-11T20:26:34.334Z",
+          "content": {
+            "plainText": "Video Document - April 5th 2024",
+            "html": "<p style=\"text-align: left;\"><span style=\"font-size: 13pt;line-height: 1.25em;\"><span style=\"font-family: courier prime, monospace;\">Video Document - April 5th 2024</span><strong><span style=\"font-family: courier prime, monospace;\"><br></span></strong></span></p>",
+            "htmlSpan": "<p style=\"text-align: left;\"><span style=\"font-size: 13pt;line-height: 1.25em;\"><span style=\"font-family: courier prime, monospace;\">Vid<span id=\"rc-suggestion-2908525-1770841589420\" class=\"rc-suggestion-highlight\" data-suggestion=\"more\" data-selected-text=\"eo Docu\">eo Docu</span>ment - <span id=\"rc-suggestion-2908525-1770841583912\" class=\"rc-suggestion-highlight\" data-suggestion=\"other text\" data-selected-text=\"April 5th\">April 5th </span>2024</span><strong><span style=\"font-family: courier prime, monospace;\"><br></span></strong></span></p>"
+          },
+          "position": {
+            "x": 319,
+            "y": 226,
+            "width": 425,
+            "height": 25
+          },
+          "dataAttributes": {
+            "data-id": "2908525",
+            "data-source": "2907217",
+            "data-locked": "0",
+            "data-editable": "1",
+            "data-tool": "text",
+            "data-title": "",
+            "data-date": "",
+            "data-options": "[]",
+            "data-rotate": "0",
+            "data-popover": "",
+            "data-popover-options": "[]",
+            "data-rc-tool-enhanced": "true"
+          },
+          "suggestions": [
+            {
+              "id": "suggestion_1770841583913",
+              "toolId": "2908525",
+              "expositionId": "2908423",
+              "weaveId": "2908424",
+              "spanId": "rc-suggestion-2908525-1770841583912",
+              "selectedText": "April 5th",
+              "suggestion": "other text",
+              "timestamp": "2026-02-11T20:26:23.913Z",
+              "url": "https://www.researchcatalogue.net/view/2908423/2908424",
+              "toolType": "text"
+            },
+            {
+              "id": "suggestion_1770841589421",
+              "toolId": "2908525",
+              "expositionId": "2908423",
+              "weaveId": "2908424",
+              "spanId": "rc-suggestion-2908525-1770841589420",
+              "selectedText": "eo Docu",
+              "suggestion": "more",
+              "timestamp": "2026-02-11T20:26:29.421Z",
+              "url": "https://www.researchcatalogue.net/view/2908423/2908424",
+              "toolType": "text"
+            }
+          ],
+          "suggestionCount": 2
+        },
+        {
+          "id": "2908526",
+          "type": "text",
+          "title": "",
+          "className": "tool tool-text  scrollbar-auto",
+          "expositionId": "2908423",
+          "weaveId": "2908424",
+          "url": "https://www.researchcatalogue.net/view/2908423/2908424",
+          "timestamp": "2026-02-11T20:26:34.334Z",
+          "content": {
+            "plainText": "Sound Recordings - April 6th 2024",
+            "html": "<p style=\"text-align: left;\"><span style=\"font-size: 13pt;line-height: 1.25em;\"><span style=\"font-family: courier prime, monospace;\">Sound Recordings - April 6th 2024</span><strong><span style=\"font-family: courier prime, monospace;\"><br></span></strong></span></p>",
+            "htmlSpan": "<p style=\"text-align: left;\"><span style=\"font-size: 13pt;line-height: 1.25em;\"><span style=\"font-family: courier prime, monospace;\">Sound Recordings - April 6th 2024</span><strong><span style=\"font-family: courier prime, monospace;\"><br></span></strong></span></p>"
+          },
+          "position": {
+            "x": 1067,
+            "y": 1939,
+            "width": 425,
+            "height": 25
+          },
+          "dataAttributes": {
+            "data-id": "2908526",
+            "data-source": "2907218",
+            "data-locked": "0",
+            "data-editable": "1",
+            "data-tool": "text",
+            "data-title": "",
+            "data-date": "",
+            "data-options": "[]",
+            "data-rotate": "0",
+            "data-popover": "",
+            "data-popover-options": "[]",
+            "data-rc-tool-enhanced": "true"
+          },
+          "suggestions": [],
+          "suggestionCount": 0
+        },
+        {
+          "id": "2908535",
+          "type": "text",
+          "title": "",
+          "className": "tool tool-text  scrollbar-auto",
+          "expositionId": "2908423",
+          "weaveId": "2908424",
+          "url": "https://www.researchcatalogue.net/view/2908423/2908424",
+          "timestamp": "2026-02-11T20:26:34.334Z",
+          "content": {
+            "plainText": "40°18'11.3\"N 18°09'37.8\"E\n\nSP10, 2-4, 73016\nSan Cesario di Lecce LE, Italien",
+            "html": "<p style=\"text-align: left;\"><strong><span style=\"font-family: courier prime, monospace; color: #ff0000;\">40°18'11.3\"N 18°09'37.8\"E</span></strong></p>\n<div class=\"iAj9Vc\">\n<div class=\"vKmG2c\"><strong><span style=\"font-family: courier prime, monospace; color: #ff0000;\">SP10, 2-4, 73016 </span></strong></div>\n<div class=\"vKmG2c\"><strong><span style=\"font-family: courier prime, monospace; color: #ff0000;\">San Cesario di Lecce LE, Italien</span></strong></div>\n</div>",
+            "htmlSpan": "<p style=\"text-align: left;\"><strong><span style=\"font-family: courier prime, monospace; color: #ff0000;\">40°18'11.3\"N 18°09'37.8\"E</span></strong></p>\n<div class=\"iAj9Vc\">\n<div class=\"vKmG2c\"><strong><span style=\"font-family: courier prime, monospace; color: #ff0000;\">SP10, 2-4, 73016 </span></strong></div>\n<div class=\"vKmG2c\"><strong><span style=\"font-family: courier prime, monospace; color: #ff0000;\">San Cesario di Lecce LE, Italien</span></strong></div>\n</div>"
+          },
+          "position": {
+            "x": 2413,
+            "y": 1127,
+            "width": 318,
+            "height": 85
+          },
+          "dataAttributes": {
+            "data-id": "2908535",
+            "data-source": "2907240",
+            "data-locked": "0",
+            "data-editable": "1",
+            "data-tool": "text",
+            "data-title": "",
+            "data-date": "",
+            "data-options": "[]",
+            "data-rotate": "0",
+            "data-popover": "",
+            "data-popover-options": "[]",
+            "data-rc-tool-enhanced": "true"
+          },
+          "suggestions": [],
+          "suggestionCount": 0
+        },
+        {
+          "id": "2908546",
+          "type": "text",
+          "title": "",
+          "className": "tool tool-text  scrollbar-auto",
+          "expositionId": "2908423",
+          "weaveId": "2908424",
+          "url": "https://www.researchcatalogue.net/view/2908423/2908424",
+          "timestamp": "2026-02-11T20:26:34.335Z",
+          "content": {
+            "plainText": "recordings are binaural, please use headphones",
+            "html": "<p style=\"text-align: left;\"><span style=\"font-size: 13pt;line-height: 1.25em;\"><strong><span style=\"font-family: courier prime, monospace;\">recordings are binaural, please use headphones</span></strong></span></p>",
+            "htmlSpan": "<p style=\"text-align: left;\"><span style=\"font-size: 13pt;line-height: 1.25em;\"><strong><span style=\"font-family: courier prime, monospace;\">recordings are binaural, please use headphones</span></strong></span></p>"
+          },
+          "position": {
+            "x": 3236,
+            "y": 2443,
+            "width": 137,
+            "height": 150
+          },
+          "dataAttributes": {
+            "data-id": "2908546",
+            "data-source": "2907216",
+            "data-locked": "0",
+            "data-editable": "1",
+            "data-tool": "text",
+            "data-title": "",
+            "data-date": "",
+            "data-options": "[]",
+            "data-rotate": "0",
+            "data-popover": "",
+            "data-popover-options": "[]",
+            "data-rc-tool-enhanced": "true"
+          },
+          "suggestions": [],
+          "suggestionCount": 0
+        }
+      ],
+      "toolCount": 6,
+      "suggestionCount": 4,
+      "lastVisited": "2026-02-11T20:26:34.335Z",
+      "pageTitle": "Observatorium (2024) by Daniele Pozzi"
+    }
+  }
+}

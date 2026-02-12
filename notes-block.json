@@ -1,10 +1,10 @@
 {
   "exposition": {
     "id": "1731661",
-    "exportTimestamp": "2026-02-11T18:54:56.366Z",
+    "exportTimestamp": "2026-02-11T20:26:54.893Z",
     "totalWeaves": 2,
     "totalTools": 9,
-    "totalSuggestions": 5
+    "totalSuggestions": 2
   },
   "weaves": {
     "1731662": {
@@ -19,17 +19,17 @@
           "expositionId": "1731661",
           "weaveId": "1731662",
           "url": "https://www.researchcatalogue.net/view/1731661/1731662",
-          "timestamp": "2026-02-11T18:54:54.095Z",
+          "timestamp": "2026-02-11T20:25:18.130Z",
           "content": {
             "plainText": "Trópos\nOverviewCompositional PrinciplesDatasetAlgorithmModules Network Documentation Hardware",
             "html": "<h1 id=\"trópos-a-plausible-taxonomy---daniele-pozzi\"><strong>Trópos</strong></h1>\n<div class=\"art-nav\"><strong><a href=\"https://www.researchcatalogue.net/view/1731661/1731662\"><span class=\"nav-item\">Overview</span></a></strong><span class=\"nav-item\"><a href=\"https://www.researchcatalogue.net/view/1731661/1732783\">Compositional Principles</a></span><a href=\"https://www.researchcatalogue.net/view/1731661/1732309\"><span class=\"nav-item\">Dataset</span></a><a href=\"https://www.researchcatalogue.net/view/1731661/1732369\"><span class=\"nav-item\">Algorithm</span></a><span class=\"nav-item\"><a href=\"https://www.researchcatalogue.net/view/1731661/1735167\">Modules</a></span> <span class=\"nav-item\"><a href=\"https://www.researchcatalogue.net/view/1731661/1740060\">Network</a></span> <span class=\"nav-item\"><a href=\"https://www.researchcatalogue.net/view/1731661/1735178\">Documentation</a></span> <a href=\"https://www.researchcatalogue.net/view/1731661/1742485\"><span class=\"nav-item\">Hardware</span></a></div>",
             "htmlSpan": "<h1 id=\"trópos-a-plausible-taxonomy---daniele-pozzi\"><strong>Trópos</strong></h1>\n<div class=\"art-nav\"><strong><a href=\"https://www.researchcatalogue.net/view/1731661/1731662\"><span class=\"nav-item\">Overview</span></a></strong><span class=\"nav-item\"><a href=\"https://www.researchcatalogue.net/view/1731661/1732783\">Compositional Principles</a></span><a href=\"https://www.researchcatalogue.net/view/1731661/1732309\"><span class=\"nav-item\">Dataset</span></a><a href=\"https://www.researchcatalogue.net/view/1731661/1732369\"><span class=\"nav-item\">Algorithm</span></a><span class=\"nav-item\"><a href=\"https://www.researchcatalogue.net/view/1731661/1735167\">Modules</a></span> <span class=\"nav-item\"><a href=\"https://www.researchcatalogue.net/view/1731661/1740060\">Network</a></span> <span class=\"nav-item\"><a href=\"https://www.researchcatalogue.net/view/1731661/1735178\">Documentation</a></span> <a href=\"https://www.researchcatalogue.net/view/1731661/1742485\"><span class=\"nav-item\">Hardware</span></a></div>"
           },
           "position": {
-            "x": 598.13330078125,
-            "y": 58.133331298828125,
-            "width": 947.7333374023438,
-            "height": 81.60000610351562
+            "x": 1134.86669921875,
+            "y": 58.116668701171875,
+            "width": 947.7666625976562,
+            "height": 83.80000305175781
           },
           "dataAttributes": {
             "data-id": "1731851",
@@ -42,7 +42,8 @@
             "data-options": "[]",
             "data-rotate": "0",
             "data-popover": "",
-            "data-popover-options": "[]"
+            "data-popover-options": "[]",
+            "data-rc-tool-enhanced": "true"
           },
           "suggestions": [],
           "suggestionCount": 0
@@ -55,17 +56,17 @@
           "expositionId": "1731661",
           "weaveId": "1731662",
           "url": "https://www.researchcatalogue.net/view/1731661/1731662",
-          "timestamp": "2026-02-11T18:54:54.095Z",
+          "timestamp": "2026-02-11T20:25:18.141Z",
           "content": {
             "plainText": "Overview\n\nTrópos is a system-specific, site-adaptive sound installation for public spaces. This exposition collects aesthetic reflections from its process of development, as well as documentation and artifacts produced along the way. Exposition is in progress.\n\n\n\n\nTrópos\n\nTrópos is a system-specific, site-adaptive sound installation developed for the Klangnetze project. Trópos is composed of a variable number of mobile sound elements – small photovoltaic computers, equipped with microphones and loudspeakers - that sonically adjust to the soundscape around them. Each element independently interacts with the sounds picked up by the microphone, generating emergent sound developments which are strongly dependent on the acoustic environment in which the piece is installed. The specific architectural, spatial and acoustic characteristics of the ambience inscribe themselves in Trópos, creating a form of aesthetic interdependency and generative co-existence of site and work.\n\n \n\nExhibitions\n\nJuly-August 2022: Trópos @ Klangnetze. In summer 2022 Trópos was part of a group exhibition distributed in multiple towns in Styria.\n\nOctober 2022: Trópos @ ARTikulationen 2022. In October 2022, ss part of the ARTikulationen festival in Graz, Austria, Trópos was presented as a pop-up installation, running for three days on the facade of Palais Meran, KUG.",
             "html": "<h4>Overview</h4>\n<p><em>Trópos</em> is a system-specific, site-adaptive sound installation for public spaces. This exposition collects aesthetic reflections from its process of development, as well as documentation and artifacts produced along the way. <span style=\"text-decoration: underline;\">Exposition is in progress.</span></p>\n<p><span style=\"text-decoration: underline;\"><br></span></p>\n<h4>Trópos</h4>\n<p><em>Trópos</em> is a system-specific, site-adaptive sound installation developed for the <a href=\"https://klangnetze.mur.at/\">Klangnetze</a> project. <em>Trópos</em> is composed of a variable number of mobile sound elements – small photovoltaic computers, equipped with microphones and loudspeakers - that sonically adjust to the soundscape around them. Each element independently interacts with the sounds picked up by the microphone, generating emergent sound developments which are strongly dependent on the acoustic environment in which the piece is installed. The specific architectural, spatial and acoustic characteristics of the ambience inscribe themselves in <em>Trópos</em>, creating a form of aesthetic interdependency and generative co-existence of <em>site</em> and <em>work</em>.</p>\n<p>&nbsp;</p>\n<h4>Exhibitions</h4>\n<ul>\n<li>\n<p><span style=\"text-decoration: underline;\"><span style=\"color: #000000; text-decoration: underline;\">July-August 2022: Trópos @ <a href=\"https://klangnetze.mur.at/\">Klangnetze</a></span></span>. In summer 2022 Trópos was part of a group exhibition distributed in multiple towns in Styria.</p>\n</li>\n<li>\n<p><span style=\"color: #000000;\"><span style=\"text-decoration: underline;\">October 2022: Trópos @ <a href=\"https://www.researchcatalogue.net/view/1625255/1698395\">ARTikulationen 202</a></span><a href=\"https://www.researchcatalogue.net/view/1625255/1698395\">2</a></span>. In October 2022, ss part of the ARTikulationen festival in Graz, Austria, Trópos was presented as a pop-up installation, running for three days on the facade of Palais Meran, KUG.</p>\n</li>\n</ul>",
-            "htmlSpan": "<h4>Overview</h4>\n<p><em>Trópos</em> is a system-s<span id=\"rc-suggestion-1731866-1770836088309\" class=\"rc-suggestion-highlight\" data-suggestion=\"yes\" data-selected-text=\"pecific, site-adaptive sound installation for public spaces. This exposition collects aesthe\">pecific, site-adaptive sound installation for public spaces. This exposition collects aesthe</span>tic reflections from its process of development, as well as documentation and artifacts produced along the way. <span style=\"text-decoration: underline;\">Exposition is in progress.</span></p>\n<p><span style=\"text-decoration: underline;\"><br></span></p>\n<h4>Trópos</h4>\n<p><em>Trópos</em> is a system-specific, site-adaptive sound installation developed for the <a href=\"https://klangnetze.mur.at/\">Klangnetze</a> project. <em>Trópos</em> is composed of a variable number of mobile sound elements – small photovoltaic computers, equipped with microphones and loudspeakers - that sonically adjust to the soundscape around them. Each element independently interacts with the sounds picked up by the microphone, generating emergent sound developments which are strongly dependent on the acoustic environment in which the piece is installed. The specific architectural, spatial and acoustic characteristics of the ambience inscribe themselves in <em>Trópos</em>, creating a form of aesthetic interdependency and generative co-existence of <em>site</em> and <em>work</em>.</p>\n<p>&nbsp;</p>\n<h4>Exhibitions</h4>\n<ul>\n<li>\n<p><span style=\"text-decoration: underline;\"><span style=\"color: #000000; text-decoration: underline;\">July-August 2022: Trópos @ <a href=\"https://klangnetze.mur.at/\">Klangnetze</a></span></span>. In summer 2022 Trópos was part of a group exhibition distributed in multiple towns in Styria.</p>\n</li>\n<li>\n<p><span style=\"color: #000000;\"><span style=\"text-decoration: underline;\">October 2022: Trópos @ <a href=\"https://www.researchcatalogue.net/view/1625255/1698395\">ARTikulationen 202</a></span><a href=\"https://www.researchcatalogue.net/view/1625255/1698395\">2</a></span>. In October 2022, ss part of the ARTikulationen festival in Graz, Austria, Trópos was presented as a pop-up installation, running for three days on the facade of Palais Meran, KUG.</p>\n</li>\n</ul>"
+            "htmlSpan": "<h4>Overview</h4>\n<p><em>Trópos</em> is a <span id=\"rc-suggestion-1731866-1770281840815\" class=\"rc-suggestion-highlight\" data-suggestion=\"another suggestion\" data-selected-text=\"system-specific, site-adaptive\">system-specific, site-adaptive</span> sound installation for public spaces. This exposition collects aesthetic reflections from its process of development, as well as documentation and artifacts produced along the way. <span style=\"text-decoration: underline;\">Exposition is in progress.</span></p>\n<p><span style=\"text-decoration: underline;\"><br></span></p>\n<h4>Trópos</h4>\n<p><em>Trópos</em> is a system-specific, site-adaptive sound installation developed for the <a href=\"https://klangnetze.mur.at/\">Klangnetze</a> project. <em>Trópos</em> is composed of a variable number of mobile sound elements – small photovoltaic computers, equipped with microphones and loudspeakers - that sonically adjust to the soundscape around them. <span id=\"rc-suggestion-1731866-1770281833180\" class=\"rc-suggestion-highlight\" data-suggestion=\"this is a suggestion\" data-selected-text=\"Each element independently interacts with the sounds picked up by the microphone\">Each element independently interacts with the sounds picked up by the microphone</span>, generating emergent sound developments which are strongly dependent on the acoustic environment in which the piece is installed. The specific architectural, spatial and acoustic characteristics of the ambience inscribe themselves in <em>Trópos</em>, creating a form of aesthetic interdependency and generative co-existence of <em>site</em> and <em>work</em>.</p>\n<p>&nbsp;</p>\n<h4>Exhibitions</h4>\n<ul>\n<li>\n<p><span style=\"text-decoration: underline;\"><span style=\"color: #000000; text-decoration: underline;\">July-August 2022: Trópos @ <a href=\"https://klangnetze.mur.at/\">Klangnetze</a></span></span>. In summer 2022 Trópos was part of a group exhibition distributed in multiple towns in Styria.</p>\n</li>\n<li>\n<p><span style=\"color: #000000;\"><span style=\"text-decoration: underline;\">October 2022: Trópos @ <a href=\"https://www.researchcatalogue.net/view/1625255/1698395\">ARTikulationen 202</a></span><a href=\"https://www.researchcatalogue.net/view/1625255/1698395\">2</a></span>. In October 2022, ss part of the ARTikulationen festival in Graz, Austria, Trópos was presented as a pop-up installation, running for three days on the facade of Palais Meran, KUG.</p>\n</li>\n</ul>"
           },
           "position": {
-            "x": 920.933349609375,
-            "y": 177.6666717529297,
-            "width": 624.9166870117188,
-            "height": 628.7000122070312
+            "x": 1457.683349609375,
+            "y": 179.81666564941406,
+            "width": 624.933349609375,
+            "height": 630.9000244140625
           },
           "dataAttributes": {
             "data-id": "1731866",
@@ -78,28 +79,16 @@
             "data-options": "[]",
             "data-rotate": "0",
             "data-popover": "",
-            "data-popover-options": "[]"
+            "data-popover-options": "[]",
+            "data-rc-tool-enhanced": "true"
           },
-          "suggestions": [
-            {
-              "id": "suggestion_1770836088309",
-              "toolId": "1731866",
-              "expositionId": "1731661",
-              "weaveId": "1731662",
-              "spanId": "rc-suggestion-1731866-1770836088309",
-              "selectedText": "pecific, site-adaptive sound installation for public spaces. This exposition collects aesthe",
-              "suggestion": "yes",
-              "timestamp": "2026-02-11T18:54:48.309Z",
-              "url": "https://www.researchcatalogue.net/view/1731661/1731662",
-              "toolType": "text"
-            }
-          ],
-          "suggestionCount": 1
+          "suggestions": [],
+          "suggestionCount": 0
         }
       ],
       "toolCount": 2,
-      "suggestionCount": 1,
-      "lastVisited": "2026-02-11T18:54:54.096Z",
+      "suggestionCount": 0,
+      "lastVisited": "2026-02-11T20:25:18.142Z",
       "pageTitle": "Trópos by Daniele Pozzi"
     },
     "1732783": {
@@ -114,7 +103,7 @@
           "expositionId": "1731661",
           "weaveId": "1732783",
           "url": "https://www.researchcatalogue.net/view/1731661/1732783",
-          "timestamp": "2026-02-11T18:54:52.670Z",
+          "timestamp": "2026-02-11T20:25:53.848Z",
           "content": {
             "plainText": "Trópos\nOverviewCompositional PrinciplesDatasetAlgorithmModules Network Documentation Hardware",
             "html": "<h1 id=\"trópos-a-plausible-taxonomy---daniele-pozzi\"><strong>Trópos</strong></h1>\n<div class=\"art-nav\"><a href=\"https://www.researchcatalogue.net/view/1731661/1731662\"><span class=\"nav-item\">Overview</span></a><strong><span class=\"nav-item\"><a href=\"https://www.researchcatalogue.net/view/1731661/1732783\">Compositional Principles</a></span></strong><a href=\"https://www.researchcatalogue.net/view/1731661/1732309\"><span class=\"nav-item\">Dataset</span></a><a href=\"https://www.researchcatalogue.net/view/1731661/1732369\"><span class=\"nav-item\">Algorithm</span></a><span class=\"nav-item\"><a href=\"https://www.researchcatalogue.net/view/1731661/1735167\">Modules</a></span> <span class=\"nav-item\"><a href=\"https://www.researchcatalogue.net/view/1731661/1740060\">Network</a></span> <span class=\"nav-item\"><a href=\"https://www.researchcatalogue.net/view/1731661/1735178\">Documentation</a></span> <a href=\"https://www.researchcatalogue.net/view/1731661/1742485\"><span class=\"nav-item\">Hardware</span></a></div>",
@@ -122,9 +111,9 @@
           },
           "position": {
             "x": 598.13330078125,
-            "y": 58.133331298828125,
+            "y": -398.58331298828125,
             "width": 947.7333374023438,
-            "height": 81.60000610351562
+            "height": 83.83332824707031
           },
           "dataAttributes": {
             "data-id": "1734063",
@@ -137,7 +126,8 @@
             "data-options": "[]",
             "data-rotate": "0",
             "data-popover": "",
-            "data-popover-options": "[]"
+            "data-popover-options": "[]",
+            "data-rc-tool-enhanced": "true"
           },
           "suggestions": [],
           "suggestionCount": 0
@@ -150,17 +140,17 @@
           "expositionId": "1731661",
           "weaveId": "1732783",
           "url": "https://www.researchcatalogue.net/view/1731661/1732783",
-          "timestamp": "2026-02-11T18:54:52.671Z",
+          "timestamp": "2026-02-11T20:25:53.849Z",
           "content": {
             "plainText": "2. Ecologies in Tropos\n\nTrópos originates from an ecological approach to sound art: a form of sound composition characterized by a marked sensibiliy toward the relationships and interactions among the humans and non-humans agents that are part of this practice.",
             "html": "<h1>2. Ecologies in Tropos</h1>\n<p><em>Trópos</em> originates from an ecological approach to sound art: a form of sound composition characterized by a marked sensibiliy toward the relationships and interactions among the humans and non-humans agents that are part of this practice.</p>\n<p>&nbsp;</p>",
-            "htmlSpan": "<h1>2. Ecologies in Tropos</h1>\n<p><em>Trópos</em> originates from an ecological approach to <span id=\"rc-suggestion-1734167-1770836044203\" class=\"rc-suggestion-highlight\" data-suggestion=\"suggestion\" data-selected-text=\"sound art: a form of sound composition ch\">sound art: a form of sound composition ch</span>aracterized by a marked sensibiliy toward the relationships and interactions among the humans and non-humans agents that are part of this practice.</p>\n<p>&nbsp;</p>"
+            "htmlSpan": "<h1>2. Ecologies in Tropos</h1>\n<p><em>Trópos</em> originates from an ecological approach to sound art: a form of sound composition characterized by a marked sensibiliy toward the relationships and interactions among the humans and non-humans agents that are part of this practice.</p>\n<p>&nbsp;</p>"
           },
           "position": {
             "x": 1243.75,
-            "y": 177.6666717529297,
+            "y": -276.816650390625,
             "width": 302.1000061035156,
-            "height": 312.183349609375
+            "height": 314.41668701171875
           },
           "dataAttributes": {
             "data-id": "1734167",
@@ -173,23 +163,11 @@
             "data-options": "[]",
             "data-rotate": "0",
             "data-popover": "",
-            "data-popover-options": "[]"
+            "data-popover-options": "[]",
+            "data-rc-tool-enhanced": "true"
           },
-          "suggestions": [
-            {
-              "id": "suggestion_1770836044203",
-              "toolId": "1734167",
-              "expositionId": "1731661",
-              "weaveId": "1732783",
-              "spanId": "rc-suggestion-1734167-1770836044203",
-              "selectedText": "sound art: a form of sound composition ch",
-              "suggestion": "suggestion",
-              "timestamp": "2026-02-11T18:54:04.203Z",
-              "url": "https://www.researchcatalogue.net/view/1731661/1732783",
-              "toolType": "text"
-            }
-          ],
-          "suggestionCount": 1
+          "suggestions": [],
+          "suggestionCount": 0
         },
         {
           "id": "1734079",
@@ -199,17 +177,17 @@
           "expositionId": "1731661",
           "weaveId": "1732783",
           "url": "https://www.researchcatalogue.net/view/1731661/1732783",
-          "timestamp": "2026-02-11T18:54:52.671Z",
+          "timestamp": "2026-02-11T20:25:53.849Z",
           "content": {
             "plainText": "2.1. Public Space\n\nA first ecological aspect concerns how Trópos relates with, and integrates in, the acoustic environment that welcomes it. Trópos is primarily conceived as a sound piece for public spaces. Public spaces are very different from more traditional exhibition spaces. A first, obvious difference is that there is no \"silence\" in a public space. The acoustic environment of, say, a public square is populated by the sounds of birds chirping, people chatting, kids playing, cars passing by and so-on. Listen, for example, to sound recordings from Gleisdorf Hauptplatz. In such a situation, special attention must be given to how the piece acoustically integrates in a soundscape which is already relatively crowded. In Trópos this integration was mainly developed through an aesthetic reflection on 1. the timbral and temporal qualities of the sounds processes involved 2. the acoustic interaction these processes have with the soundscape around them.",
             "html": "<h2>2.1. Public Space</h2>\n<p>A first ecological aspect concerns how <em>Trópos</em> relates with, and integrates in, the acoustic environment that welcomes it. <em>Trópos</em> is primarily conceived as a sound piece for public spaces. Public spaces are very different from more traditional exhibition spaces. A first, obvious difference is that there is no \"silence\" in a public space. The acoustic environment of, say, a public square is populated by the sounds of birds chirping, people chatting, kids playing, cars passing by and so-on. Listen, for example, to sound recordings from <a href=\"https://klangnetze.mur.at/posts/gleisdorf/\">Gleisdorf Hauptplatz</a>. In such a situation, special attention must be given to how the piece acoustically integrates in a soundscape which is already relatively crowded. In <em>Trópos&nbsp;</em>this integration was mainly developed through an aesthetic reflection on 1. the timbral and temporal qualities of the sounds processes involved 2. the acoustic interaction these processes have with the soundscape around them.</p>",
-            "htmlSpan": "<h2>2.1. Public Space</h2>\n<p>A first ecological aspect concerns how <em>Trópos</em> relates with, and integrates in, the acoustic environment that welcomes it. <em>Trópos</em> is primarily conceived as a sound piece for public spaces. Public spaces are very different from more traditional exhibition spaces. A first, obvious difference is that there is no \"silence\" in a public space. The acoustic environm<span id=\"rc-suggestion-1734079-1770836052298\" class=\"rc-suggestion-highlight\" data-suggestion=\"suggestion\" data-selected-text=\"ent of, say, a public square is populated by the sounds of birds chirping, people chatting, kids playing, cars passing by and so\">ent of, say, a public square is populated by the sounds of birds chirping, people chatting, kids playing, cars passing by and so</span>-on. Lis<span id=\"rc-suggestion-1734079-1770836066288\" class=\"rc-suggestion-highlight\" data-suggestion=\"another\" data-selected-text=\"ten, for example, to sound recordings from Gleisdorf Hauptplatz. In such a situation, special attention must be given to how the piece acoustic\">ten, for example, to sound recordings from <a href=\"https://klangnetze.mur.at/posts/gleisdorf/\">Gleisdorf Hauptplatz</a>. In such a situation, special attention must be given to how the piece acoustic</span>ally integrates in a soundscape which is already relatively crowded. In <em>Trópos&nbsp;</em>this integration was mainly developed through an aesthetic reflection on 1. the timbral and temporal qualities of the sounds proce<span id=\"rc-suggestion-1734079-1770836073892\" class=\"rc-suggestion-highlight\" data-suggestion=\"fourth\" data-selected-text=\"sses invol\">sses invol</span>ved 2. the acoustic interaction these processes have with the soundscape around them.</p>"
+            "htmlSpan": "<h2>2.1. Public Space</h2>\n<p>A first ecological aspect concerns how <em>Trópos</em> relates with, and integrates in, the acoustic environment that welcomes it. <em>Trópos</em> is primarily conceived as a sound piece for public spaces. Public spaces are very different from more traditional exhibition spaces. A first, obvious difference is that there is no \"silence\" in a publi<span id=\"rc-suggestion-1734079-1770841553842\" class=\"rc-suggestion-highlight\" data-suggestion=\"text review\" data-selected-text=\"c space. The acoustic environment of, say, a public square is populated by the sounds of birds chirping, people chatting, kids playing, cars\">c space. The acoustic environment of, say, a public square is populated by the sounds of birds chirping, people chatting, kids playing, cars </span>passing by and so-on. Listen, for example, to sound recordings from <a href=\"https://klangnetze.mur.at/posts/gleisdorf/\">Gleisdorf Hauptplatz</a>. In such a situation, special attention must be given to how the piece acoustically integrates in a soundscape which is already relatively crowded. In <em>Trópos&nbsp;</em>this integration was mainly developed through an aesthetic reflection on 1. the timbral and temporal qualities of the sounds processes involved 2. the acoustic interaction these processes have with the soundscape around them.</p>"
           },
           "position": {
             "x": 598.13330078125,
-            "y": 632.2166748046875,
+            "y": 177.73333740234375,
             "width": 947.7333374023438,
-            "height": 258.5666809082031
+            "height": 260.79998779296875
           },
           "dataAttributes": {
             "data-id": "1734079",
@@ -222,47 +200,24 @@
             "data-options": "[]",
             "data-rotate": "0",
             "data-popover": "",
-            "data-popover-options": "[]"
+            "data-popover-options": "[]",
+            "data-rc-tool-enhanced": "true"
           },
           "suggestions": [
             {
-              "id": "suggestion_1770836052298",
+              "id": "suggestion_1770841553842",
               "toolId": "1734079",
               "expositionId": "1731661",
               "weaveId": "1732783",
-              "spanId": "rc-suggestion-1734079-1770836052298",
-              "selectedText": "ent of, say, a public square is populated by the sounds of birds chirping, people chatting, kids playing, cars passing by and so",
-              "suggestion": "suggestion",
-              "timestamp": "2026-02-11T18:54:12.298Z",
-              "url": "https://www.researchcatalogue.net/view/1731661/1732783",
-              "toolType": "text"
-            },
-            {
-              "id": "suggestion_1770836066289",
-              "toolId": "1734079",
-              "expositionId": "1731661",
-              "weaveId": "1732783",
-              "spanId": "rc-suggestion-1734079-1770836066288",
-              "selectedText": "ten, for example, to sound recordings from Gleisdorf Hauptplatz. In such a situation, special attention must be given to how the piece acoustic",
-              "suggestion": "another",
-              "timestamp": "2026-02-11T18:54:26.289Z",
-              "url": "https://www.researchcatalogue.net/view/1731661/1732783",
-              "toolType": "text"
-            },
-            {
-              "id": "suggestion_1770836073892",
-              "toolId": "1734079",
-              "expositionId": "1731661",
-              "weaveId": "1732783",
-              "spanId": "rc-suggestion-1734079-1770836073892",
-              "selectedText": "sses invol",
-              "suggestion": "fourth",
-              "timestamp": "2026-02-11T18:54:33.892Z",
+              "spanId": "rc-suggestion-1734079-1770841553842",
+              "selectedText": "c space. The acoustic environment of, say, a public square is populated by the sounds of birds chirping, people chatting, kids playing, cars",
+              "suggestion": "text review",
+              "timestamp": "2026-02-11T20:25:53.842Z",
               "url": "https://www.researchcatalogue.net/view/1731661/1732783",
               "toolType": "text"
             }
           ],
-          "suggestionCount": 3
+          "suggestionCount": 1
         },
         {
           "id": "1734213",
@@ -272,17 +227,17 @@
           "expositionId": "1731661",
           "weaveId": "1732783",
           "url": "https://www.researchcatalogue.net/view/1731661/1732783",
-          "timestamp": "2026-02-11T18:54:52.671Z",
+          "timestamp": "2026-02-11T20:25:53.849Z",
           "content": {
             "plainText": "2.1.1 (Im)Plausibility\n\nTropos timbral and temporal qualities are composed in order to acoustically blend within an outdoor soundscape. The strategy adopted here was to work initially with sounds which are plausible1 in this context, and then to explore the boundary between the plausible and implausible. The sonic qualities of Tropos might then recall either natural sounds (crowing, howling, chirping, blowing, etc.) or artificial sounds (motors and other kinds of static noises), which are usually found in an outdoor city context, but with a kind of electronic coloration. In this way, Tropos can sonically blend with a city soundscape while still being recognisable as an aesthetic sound intervention.\n\n1. The term \"plausible\" refers back to Max Neuhaus and his creation of a permanent public sound work carefully designed to blend with its auditory environment. Max Neuhaus, \"Notes on Place and Moment\".",
-            "html": "<h4>2.1.1 (Im)Plausibility</h4>\n<p>Tropos timbral and temporal qualities are composed in order to acoustically blend within an outdoor soundscape. The strategy adopted here was to work initially with sounds which are <em>plausible</em><sup>1</sup> in this context, and then to explore the boundary between the <em>plausible</em> and <em>implausible</em>. The sonic qualities of Tropos might then recall either natural sounds (crowing, howling, chirping, blowing, etc.) or artificial sounds (motors and other kinds of static noises), which are usually found in an outdoor city context, but with a kind of electronic coloration. In this way, Tropos can sonically blend with a city soundscape while still being recognisable as an aesthetic sound intervention.</p>\n<p><span style=\"font-size: 10pt;line-height: 1.25em;\">1. </span><span class=\"html-text-editor-content mceContentBody\"><span style=\"font-size: 10pt;line-height: 1.25em;\">The term \"plausible\" refers back to Max Neuhaus and his creation of a permanent public sound work carefully designed to blend with its auditory environment. <em>Max Neuhaus, \"Notes on Place and Moment\"</em>.</span><br></span></p>",
-            "htmlSpan": "<h4>2.1.1 (Im)Plausibility</h4>\n<p>Tropos timbral and temporal qualities are composed in order to aco<span id=\"rc-suggestion-1734213-1770835629957\" class=\"rc-suggestion-highlight\" data-suggestion=\"suggestion\" data-selected-text=\"ustically blend within an outdoor soundscape. The strategy adopted here was to work initially with sounds which are plausible1 in this context, and then to explore the boundary between the plausible and implausible. The sonic qualiti\">ustically blend within an outdoor soundscape. The strategy adopted here was to work initially with sounds which are <em>plausible</em><sup>1</sup> in this context, and then to explore the boundary between the <em>plausible</em> and <em>implausible</em>. The sonic qualiti</span>es of Tropos might then recall either natural sounds (crowing, howling, chirping, blowing, etc.) or artificial sounds (motors and other kinds of static noises), whi<span id=\"rc-suggestion-1734213-1770835623324\" class=\"rc-suggestion-highlight\" data-suggestion=\"suggestion\" data-selected-text=\"ch are usually found in an outdoor city context, but with a kind of electronic coloration. In this way, Tropos can sonically blend with a city soundscape\">ch are usually found in an outdoor city context, but with a kind of electronic coloration. In this way, Tropos can sonically blend with a city soundscape </span>while still being recognisable as an aesthetic sound intervention.</p>\n<p><span style=\"font-size: 10pt;line-height: 1.25em;\">1. </span><span class=\"html-text-editor-content mceContentBody\"><span style=\"font-size: 10pt;line-height: 1.25em;\">The term \"plausible\" refers back to Max Neuhaus and his creation of a permanent public sound work carefully designed to blend with its auditory environment. <em>Max Neuhaus, \"Notes on Place and Moment\"</em>.</span><br></span></p>"
+            "html": "<h4>2.1.1 (Im)Plausibility</h4>\n<p>Tropos timbral and temporal qualities are composed in order to acoustically blend within an outdoor soundscape. The strategy adopted here was to work initially with sounds which are plausible1 in this context, and then to explore the boundary between the plausible and implausible. The sonic qualities of Tropos might then recall either natural sounds (crowing, howling, chirping, blowing, etc.) or artificial sounds (motors and other kinds of static noises), which are usually found in an outdoor city context, but with a kind of electronic coloration. In this way, Tropos can sonically blend with a city soundscape while still being recognisable as an aesthetic sound intervention.</p>\n<p><span style=\"font-size: 10pt;line-height: 1.25em;\">1. </span><span class=\"html-text-editor-content mceContentBody\"><span style=\"font-size: 10pt;line-height: 1.25em;\">The term \"plausible\" refers back to Max Neuhaus and his creation of a permanent public sound work carefully designed to blend with its auditory environment. <em>Max Neuhaus, \"Notes on Place and Moment\"</em>.</span><br></span></p>",
+            "htmlSpan": "<h4>2.1.1 (Im)Plausibility</h4>\n<p>Tropos timbral and temporal qualities are composed in order to acoustically blend within an outdoor soundscape. The strategy a<span id=\"rc-suggestion-1734213-1770841546181\" class=\"rc-suggestion-highlight\" data-suggestion=\"test review\" data-selected-text=\"dopted here was to work initially with sounds which are plausible1 in this context, and then to explore the boundary between the plausible and implausible. The sonic qualities of Tropos might then recall either natur\">dopted here was to work initially with sounds which are <em>plausible</em><sup>1</sup> in this context, and then to explore the boundary between the <em>plausible</em> and <em>implausible</em>. The sonic qualities of Tropos might then recall either natur</span>al sounds (crowing, howling, chirping, blowing, etc.) or artificial sounds (motors and other kinds of static noises), which are usually found in an outdoor city context, but with a kind of electronic coloration. In this way, Tropos can sonically blend with a city soundscape while still being recognisable as an aesthetic sound intervention.</p>\n<p><span style=\"font-size: 10pt;line-height: 1.25em;\">1. </span><span class=\"html-text-editor-content mceContentBody\"><span style=\"font-size: 10pt;line-height: 1.25em;\">The term \"plausible\" refers back to Max Neuhaus and his creation of a permanent public sound work carefully designed to blend with its auditory environment. <em>Max Neuhaus, \"Notes on Place and Moment\"</em>.</span><br></span></p>"
           },
           "position": {
             "x": 598.13330078125,
-            "y": 928.7166748046875,
+            "y": 476.4666748046875,
             "width": 947.7333374023438,
-            "height": 250.2666778564453
+            "height": 252.5
           },
           "dataAttributes": {
             "data-id": "1734213",
@@ -295,10 +250,24 @@
             "data-options": "[]",
             "data-rotate": "0",
             "data-popover": "",
-            "data-popover-options": "[]"
+            "data-popover-options": "[]",
+            "data-rc-tool-enhanced": "true"
           },
-          "suggestions": [],
-          "suggestionCount": 0
+          "suggestions": [
+            {
+              "id": "suggestion_1770841546181",
+              "toolId": "1734213",
+              "expositionId": "1731661",
+              "weaveId": "1732783",
+              "spanId": "rc-suggestion-1734213-1770841546181",
+              "selectedText": "dopted here was to work initially with sounds which are plausible1 in this context, and then to explore the boundary between the plausible and implausible. The sonic qualities of Tropos might then recall either natur",
+              "suggestion": "test review",
+              "timestamp": "2026-02-11T20:25:46.181Z",
+              "url": "https://www.researchcatalogue.net/view/1731661/1732783",
+              "toolType": "text"
+            }
+          ],
+          "suggestionCount": 1
         },
         {
           "id": "1734760",
@@ -308,7 +277,7 @@
           "expositionId": "1731661",
           "weaveId": "1732783",
           "url": "https://www.researchcatalogue.net/view/1731661/1732783",
-          "timestamp": "2026-02-11T18:54:52.671Z",
+          "timestamp": "2026-02-11T20:25:53.849Z",
           "content": {
             "plainText": "2.1.2 Interaction\n\nAt the same time, Tropos acoustically interacts with its environment by adapting its sonic behavior to the soundscape in which it is installed. This is concretely realized by directly coupling a non-standard FM synthesis algorithm with the ambience sounds picked up by the microphone. In this way, Tropos is in a constant acoustic exchange with its environment: it affects the soundscape by generating sounds, and it is affected by what sonically happens around it. This feedback loop between tropos and its site generates a lively sound situation in which the work is in a direct aesthetic interdependence with the place in which it is installed. The design of this aesthetic interdependence, and the study of the ecology of its interactions, is the main compositional focus of Tropos: site and work contribute in equal measure to the emergence of the ascoustic behaviors that can be heard in-situ.",
             "html": "<h4>2.1.2 Interaction</h4>\n<p>At the same time, Tropos acoustically interacts with its environment by adapting its sonic behavior to the soundscape in which it is installed. This is concretely realized by directly coupling a non-standard FM synthesis algorithm with the ambience sounds picked up by the microphone. In this way, Tropos is in a constant acoustic exchange with its environment: it affects the soundscape by generating sounds, and it is affected by what sonically happens around it. This feedback loop between tropos and its site generates a lively sound situation in which the work is in a direct aesthetic interdependence with the place in which it is installed. The design of this aesthetic interdependence, and the study of the ecology of its interactions, is the main compositional focus of Tropos: site and work contribute in equal measure to the emergence of the ascoustic behaviors that can be heard in-situ.</p>\n<p>&nbsp;</p>\n<p>&nbsp;</p>",
@@ -316,9 +285,9 @@
           },
           "position": {
             "x": 598.13330078125,
-            "y": 1281.9166259765625,
+            "y": 831.9000244140625,
             "width": 463.51666259765625,
-            "height": 478.6499938964844
+            "height": 480.88336181640625
           },
           "dataAttributes": {
             "data-id": "1734760",
@@ -331,7 +300,8 @@
             "data-options": "[]",
             "data-rotate": "0",
             "data-popover": "",
-            "data-popover-options": "[]"
+            "data-popover-options": "[]",
+            "data-rc-tool-enhanced": "true"
           },
           "suggestions": [],
           "suggestionCount": 0
@@ -344,7 +314,7 @@
           "expositionId": "1731661",
           "weaveId": "1732783",
           "url": "https://www.researchcatalogue.net/view/1731661/1732783",
-          "timestamp": "2026-02-11T18:54:52.671Z",
+          "timestamp": "2026-02-11T20:25:53.849Z",
           "content": {
             "plainText": "2.2. Compositional Process\n\nOn a more general note, the compositional approach behind Tropos is characterized by a special attention towards the complex ecology of relations between compositional thought, aesthetic ideas and their material implementation. A small piece of software is what allows Tropos to relate non-standard synthesis technique with the live microphone input. This is the result of a form of iterative software experimentation, in which the relation between aesthetic speculation, algorithmic formulation, and the emerging aesthetic artefact constantly inform each other, in an almost inextricable compound that could be (very) roughly simplified as a single feedback loop (side Figure). In composing Tropos, special attention was given to this ecology of relations, and in particular to moments of aesthetic individuation: moments in which the direct exposure to the aesthetic qualities that emerge out of the experimental process redirect one's own aesthetic direction and reflection.",
             "html": "<h2>2.2. Compositional Process</h2>\n<p>On a more general note, the compositional approach behind Tropos is characterized by a special attention towards the complex ecology of relations between compositional thought, aesthetic ideas and their material implementation. A small piece of software is what allows Tropos to relate non-standard synthesis technique with the live microphone input. This is the result of a form of iterative <em>software experimentation</em>, in which the relation between aesthetic speculation, algorithmic formulation, and the emerging aesthetic artefact constantly inform each other, in an almost inextricable compound that could be (<em>very</em>) roughly simplified as a single feedback loop (side Figure). In composing Tropos, special attention was given to this ecology of relations, and in particular to moments of <em>aesthetic individuation:</em> moments in which the direct exposure to the aesthetic qualities that emerge out of the experimental process redirect one's own aesthetic direction and reflection.</p>",
@@ -352,9 +322,9 @@
           },
           "position": {
             "x": 598.13330078125,
-            "y": 2051.183349609375,
+            "y": 1601.1666259765625,
             "width": 624.9166870117188,
-            "height": 354.566650390625
+            "height": 356.79998779296875
           },
           "dataAttributes": {
             "data-id": "1734974",
@@ -367,7 +337,8 @@
             "data-options": "[]",
             "data-rotate": "0",
             "data-popover": "",
-            "data-popover-options": "[]"
+            "data-popover-options": "[]",
+            "data-rc-tool-enhanced": "true"
           },
           "suggestions": [],
           "suggestionCount": 0
@@ -380,7 +351,7 @@
           "expositionId": "1731661",
           "weaveId": "1732783",
           "url": "https://www.researchcatalogue.net/view/1731661/1732783",
-          "timestamp": "2026-02-11T18:54:52.671Z",
+          "timestamp": "2026-02-11T20:25:53.849Z",
           "content": {
             "plainText": "2.2.1 Data\n\nAs a result of this focus on moments of aesthetic individuation a dataset was produced that captures these moments. Essentially, this datset is an attempt at partially removing a certain precariousness that characterizes these volatile moments, making them available for later listening and reinterpretation, \"freezing\" that potential of hinting towards ways of experimentally engaging with their aesthetic performativity. Each entry in the dataset consists of a set of parameters that define a specific software configuration, coupled with a short recording of the audio output. In composing Tropos 97 entries were recorded, which later formed the basis for the work itself. A multimedia (graphics + sound) representation of the dataset is available here.",
             "html": "<h4>2.2.1 Data</h4>\n<p>As a result of this focus on moments of <em>aesthetic individuation</em> a dataset was produced that captures these moments. Essentially, this datset is an attempt at partially removing a certain precariousness that characterizes these volatile moments, making them available for later listening and reinterpretation, \"freezing\" that potential of hinting towards ways of experimentally engaging with their aesthetic performativity. Each entry in the dataset consists of a set of parameters that define a specific software configuration, coupled with a short recording of the audio output. In composing Tropos 97 entries were recorded, which later formed the basis for the work itself. A multimedia (graphics + sound) representation of the dataset is available <a href=\"https://www.researchcatalogue.net/view/1731661/1732309\">here</a>.</p>",
@@ -388,9 +359,9 @@
           },
           "position": {
             "x": 598.13330078125,
-            "y": 2443.683349609375,
+            "y": 1995.9000244140625,
             "width": 947.7333374023438,
-            "height": 189.88333129882812
+            "height": 192.11666870117188
           },
           "dataAttributes": {
             "data-id": "1734763",
@@ -403,15 +374,16 @@
             "data-options": "[]",
             "data-rotate": "0",
             "data-popover": "",
-            "data-popover-options": "[]"
+            "data-popover-options": "[]",
+            "data-rc-tool-enhanced": "true"
           },
           "suggestions": [],
           "suggestionCount": 0
         }
       ],
       "toolCount": 7,
-      "suggestionCount": 4,
-      "lastVisited": "2026-02-11T18:54:52.671Z",
+      "suggestionCount": 2,
+      "lastVisited": "2026-02-11T20:25:53.850Z",
       "pageTitle": "Trópos by Daniele Pozzi"
     }
   }
