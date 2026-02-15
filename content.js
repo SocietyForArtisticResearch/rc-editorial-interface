@@ -416,44 +416,92 @@ async function storeToolsInMemory(tools) {
 
 // Function to update save button with total tool count
 async function updateSaveButtonCount(expositionData) {
+    console.log(`🔄 updateSaveButtonCount called`);
+    
     const saveButton = document.getElementById('rc-save-tools-btn');
+    console.log(`🔍 Save button found:`, saveButton ? 'YES' : 'NO');
+    
     if (!saveButton) return;
     
     const bodyElement = document.body;
     const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
     
-    // Count suggestions across all weaves
-    let totalSuggestions = 0;
+    // Count resolved comments and accepted suggestions across all weaves
+    let totalResolvedComments = 0;
+    let totalAcceptedSuggestions = 0;
     
-    // Get suggestions for each weave and count them
+    // Get resolved comments and accepted suggestions for each weave
     for (const weaveId of Object.keys(expositionData.weaves)) {
-        const suggestionsKey = `rc_suggestions_${expositionId}_${weaveId}`;
-        const suggestionsResult = await browser.storage.local.get(suggestionsKey);
-        const weavesSuggestions = suggestionsResult[suggestionsKey] || {};
+        console.log(`🔍 Checking weave ${weaveId} for resolved/accepted data...`);
         
-        // Count suggestions for each tool in this weave
-        Object.values(weavesSuggestions).forEach(toolSuggestions => {
+        // Count resolved comments
+        const resolvedCommentsKey = `rc_resolved_comments_${expositionId}_${weaveId}`;
+        console.log(`🔍 Looking for resolved comments with key: ${resolvedCommentsKey}`);
+        const resolvedResult = await browser.storage.local.get(resolvedCommentsKey);
+        const resolvedComments = resolvedResult[resolvedCommentsKey] || {};
+        
+        console.log(`📊 Resolved comments data:`, resolvedComments);
+        
+        // Count resolved comments for each tool in this weave
+        Object.values(resolvedComments).forEach(toolComments => {
+            if (Array.isArray(toolComments)) {
+                console.log(`📊 Found ${toolComments.length} resolved comments for a tool`);
+                totalResolvedComments += toolComments.length;
+            }
+        });
+        
+        // Count accepted suggestions
+        const acceptedSuggestionsKey = `rc_accepted_suggestions_${expositionId}_${weaveId}`;
+        console.log(`🔍 Looking for accepted suggestions with key: ${acceptedSuggestionsKey}`);
+        const acceptedResult = await browser.storage.local.get(acceptedSuggestionsKey);
+        const acceptedSuggestions = acceptedResult[acceptedSuggestionsKey] || {};
+        
+        console.log(`📊 Accepted suggestions data:`, acceptedSuggestions);
+        
+        // Count accepted suggestions for each tool in this weave
+        Object.values(acceptedSuggestions).forEach(toolSuggestions => {
             if (Array.isArray(toolSuggestions)) {
-                totalSuggestions += toolSuggestions.length;
+                console.log(`📊 Found ${toolSuggestions.length} accepted suggestions for a tool`);
+                totalAcceptedSuggestions += toolSuggestions.length;
             }
         });
     }
     
-    let totalTools = 0;
-    let weaveCount = 0;
+    console.log(`📊 Final counts: ${totalResolvedComments} resolved, ${totalAcceptedSuggestions} accepted`);
     
-    Object.values(expositionData.weaves).forEach(weave => {
-        totalTools += weave.tools.length;
-        weaveCount++;
-    });
+    let weaveCount = Object.keys(expositionData.weaves).length;
     
     const buttonText = saveButton.querySelector('span') || saveButton;
     buttonText.innerHTML = `
         <svg width="16" height="16" viewBox="0 0 16 16" style="margin-right: 6px;">
             <path fill="currentColor" d="M13 0H3a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V3a3 3 0 0 0-3-3zM8 1.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zM11 14.5H5a.5.5 0 0 1 0-1h6a.5.5 0 0 1 0 1z"/>
         </svg>
-        Save ${totalTools} Tools, ${totalSuggestions} Suggestions (${weaveCount} weaves)
+        Save ${totalResolvedComments} Resolved Comments, ${totalAcceptedSuggestions} Accepted Suggestions (${weaveCount} weaves)
     `;
+}
+
+// Function to update save button count after resolving/accepting actions
+async function updateSaveButtonCountAfterAction(expositionId) {
+    try {
+        console.log(`🔄 updateSaveButtonCountAfterAction called for exposition ${expositionId}`);
+        
+        // Get stored tools for this exposition  
+        const storageKey = `rc_exposition_${expositionId}`;
+        const result = await browser.storage.local.get(storageKey);
+        const expositionData = result[storageKey];
+        
+        console.log(`📊 Found exposition data:`, expositionData ? 'YES' : 'NO');
+        
+        if (expositionData) {
+            console.log(`🔄 Calling updateSaveButtonCount...`);
+            await updateSaveButtonCount(expositionData);
+            console.log(`✅ Save button count updated`);
+        } else {
+            console.warn(`⚠️ No exposition data found for ${expositionId}`);
+        }
+    } catch (error) {
+        console.error('❌ Error updating save button count:', error);
+    }
 }
 
 // Function to create save button
@@ -2245,20 +2293,60 @@ async function resolveComment(spanElement) {
         
         // Find the comment to resolve
         const commentToResolve = toolSuggestions.find(s => s.spanId === spanId);
+        let commentData;
+        
         if (commentToResolve) {
+            // Capture full tool HTML content for audit trail
+            const toolContent = tool.outerHTML;
+            const toolContentLength = toolContent.length;
+            console.log(`📄 Capturing full tool HTML content (${toolContentLength} chars) for comment ${spanId}`);
+            
             // Add resolution metadata
             commentToResolve.resolvedAt = new Date().toISOString();
             commentToResolve.resolvedBySpanRemoval = true;
             commentToResolve.originalSpanInfo = spanInfo;
+            commentToResolve.fullToolHtmlAtResolution = toolContent;
+            commentToResolve.toolHtmlLength = toolContentLength;
             
-            // Move to resolved comments storage
-            if (!resolvedComments[toolId]) {
-                resolvedComments[toolId] = [];
-            }
-            resolvedComments[toolId].push(commentToResolve);
+            commentData = commentToResolve;
+        } else {
+            // Comment not in storage, create from span data
+            console.log(`⚠️ Comment not in storage, creating from span data...`);
             
-            console.log(`📦 Moved comment ${spanId} to resolved storage with metadata`);
+            // Extract data from span attributes
+            const suggestion = spanElement.getAttribute('data-suggestion') || '';
+            const selectedText = spanElement.getAttribute('data-selected') || spanText;
+            
+            // Capture full tool HTML content for audit trail
+            const toolContent = tool.outerHTML;
+            const toolContentLength = toolContent.length;
+            console.log(`📄 Capturing full tool HTML content (${toolContentLength} chars) for comment ${spanId}`);
+            
+            commentData = {
+                spanId: spanId,
+                suggestion: suggestion,
+                selectedText: selectedText,
+                type: spanType,
+                timestamp: new Date().toISOString(),
+                toolId: toolId,
+                recreatedFromSpan: true,
+                resolvedAt: new Date().toISOString(),
+                resolvedBySpanRemoval: true,
+                originalSpanInfo: spanInfo,
+                fullToolHtmlAtResolution: toolContent,
+                toolHtmlLength: toolContentLength
+            };
+            
+            console.log(`✅ Created comment from span attributes:`, commentData);
         }
+        
+        // Move to resolved comments storage
+        if (!resolvedComments[toolId]) {
+            resolvedComments[toolId] = [];
+        }
+        resolvedComments[toolId].push(commentData);
+        
+        console.log(`📦 Moved comment ${spanId} to resolved storage with metadata`);
         
         // Remove the comment from active suggestions
         const updatedSuggestions = toolSuggestions.filter(s => s.spanId !== spanId);
@@ -2278,6 +2366,9 @@ async function resolveComment(spanElement) {
         
         // Update the suggestion badge count
         await updateToolWithSuggestionCount(tool);
+        
+        // Update save button count to reflect the resolved comment
+        await updateSaveButtonCountAfterAction(expositionId);
         
         console.log(`✅ Comment ${spanId} resolved successfully`);
         
@@ -2396,21 +2487,7 @@ async function acceptSuggestion(spanElement) {
         
         console.log(`🔄 Accepting suggestion ${spanId} in tool ${toolId}`);
         
-        // Store span info for RC update before DOM modification
-        const spanInfo = {
-            id: spanId,
-            originalText: originalText || spanElement.textContent,
-            suggestedText: suggestedText,
-            outerHTML: spanElement.outerHTML
-        };
-        
-        // Replace the span content with the suggested text (no highlighting)
-        const textNode = document.createTextNode(suggestedText);
-        spanElement.parentNode.replaceChild(textNode, spanElement);
-        
-        console.log(`✂️ Replaced span ${spanId} with suggested text in DOM`);
-        
-        // Remove from active suggestions storage and move to accepted suggestions storage
+        // FIRST: Move from active to accepted storage BEFORE any DOM/RC changes
         const bodyElement = document.body;
         const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
         const weaveId = bodyElement.dataset.weave || extractFromUrl('weave') || 'unknown';
@@ -2422,13 +2499,54 @@ async function acceptSuggestion(spanElement) {
         const acceptedSuggestions = result[acceptedStorageKey] || {};
         const toolSuggestions = suggestions[toolId] || [];
         
-        // Find the suggestion to accept
-        const suggestionToAccept = toolSuggestions.find(s => s.spanId === spanId);
+        console.log(`🔍 DEBUG: Looking for suggestion ${spanId} in tool ${toolId}`);
+        console.log(`🔍 DEBUG: toolSuggestions array:`, toolSuggestions);
+        console.log(`🔍 DEBUG: toolSuggestions length:`, toolSuggestions.length);
+        
+        // Find the suggestion to accept - if not in storage, get from span attributes
+        let suggestionToAccept = toolSuggestions.find(s => s.spanId === spanId);
+        console.log(`🔍 DEBUG: suggestionToAccept found in storage:`, suggestionToAccept ? 'YES' : 'NO');
+        
+        if (!suggestionToAccept) {
+            console.log(`⚠️ Suggestion not in storage, creating from span data...`);
+            // Create suggestion object from span attributes
+            const suggestionText = spanElement.getAttribute('data-suggestion');
+            const selectedText = spanElement.getAttribute('data-selected-text');
+            const type = spanElement.getAttribute('data-type') || 'suggestion';
+            
+            if (suggestionText && selectedText) {
+                suggestionToAccept = {
+                    spanId: spanId,
+                    suggestion: suggestionText,
+                    selectedText: selectedText,
+                    type: type,
+                    timestamp: new Date().toISOString(),
+                    // Add any other fields we might need
+                    toolId: toolId,
+                    recreatedFromSpan: true
+                };
+                console.log(`✅ Created suggestion from span attributes:`, suggestionToAccept);
+            } else {
+                console.error(`❌ Cannot create suggestion - missing span attributes`);
+                throw new Error('Cannot accept suggestion - missing required data');
+            }
+        }
+        
         if (suggestionToAccept) {
+            console.log(`🔍 DEBUG: suggestionToAccept data:`, suggestionToAccept);
+            
+            // Get full tool content for audit trail
+            const tool = spanElement.closest('.tool-text, .tool-simpletext');
+            const toolContent = tool ? tool.outerHTML : null;
+            const toolContentLength = toolContent ? toolContent.length : 0;
+            
+            console.log(`📄 Capturing full tool HTML content (${toolContentLength} chars) for suggestion ${spanId}`);
+            
             // Add acceptance metadata
             suggestionToAccept.acceptedAt = new Date().toISOString();
             suggestionToAccept.acceptedByTextReplacement = true;
-            suggestionToAccept.originalSpanInfo = spanInfo;
+            suggestionToAccept.fullToolHtmlAtAcceptance = toolContent;
+            suggestionToAccept.toolHtmlLength = toolContentLength;
             
             // Move to accepted suggestions storage
             if (!acceptedSuggestions[toolId]) {
@@ -2443,7 +2561,7 @@ async function acceptSuggestion(spanElement) {
         const updatedSuggestions = toolSuggestions.filter(s => s.spanId !== spanId);
         suggestions[toolId] = updatedSuggestions;
         
-        // Save both storages
+        // Save both storages BEFORE DOM/RC changes
         await browser.storage.local.set({ 
             [storageKey]: suggestions,
             [acceptedStorageKey]: acceptedSuggestions
@@ -2451,12 +2569,35 @@ async function acceptSuggestion(spanElement) {
         
         console.log(`🗑️ Removed suggestion ${spanId} from active storage`);
         console.log(`💾 Stored accepted suggestion ${spanId} with acceptance metadata`);
+        console.log(`🔍 DEBUG: Storage keys used:`, { storageKey, acceptedStorageKey });
+        console.log(`🔍 DEBUG: Data being stored to acceptedStorageKey:`, acceptedSuggestions);
+        
+        // Verify the storage worked by reading it back immediately
+        const verifyResult = await browser.storage.local.get(acceptedStorageKey);
+        console.log(`🔍 DEBUG: Verification read from storage:`, verifyResult);
+
+        // Store span info for RC update before DOM modification
+        const spanInfo = {
+            id: spanId,
+            originalText: originalText || spanElement.textContent,
+            suggestedText: suggestedText,
+            outerHTML: spanElement.outerHTML
+        };
+        
+        // Replace the span content with the suggested text (no highlighting)
+        const textNode = document.createTextNode(suggestedText);
+        spanElement.parentNode.replaceChild(textNode, spanElement);
+        
+        console.log(`✂️ Replaced span ${spanId} with suggested text in DOM`);
         
         // Update the tool via RC API (pass spanInfo for proper text replacement)
         await updateToolAfterSuggestionAcceptance(tool, toolId, spanInfo);
         
         // Update the suggestion badge count
         await updateToolWithSuggestionCount(tool);
+        
+        // Update save button count to reflect the accepted suggestion
+        await updateSaveButtonCountAfterAction(expositionId);
         
         console.log(`✅ Suggestion ${spanId} accepted successfully`);
         
