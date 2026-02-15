@@ -525,6 +525,26 @@ async function saveAllToolsAsJSON() {
     
     console.log('RC Tool Commenter: Exporting exposition data:', expositionData);
     
+    // Get all resolved comments for all weaves in this exposition
+    const allStorageKeys = await browser.storage.local.get();
+    const resolvedComments = {};
+    let totalResolvedComments = 0;
+    
+    // Find all resolved comments storage keys for this exposition
+    Object.keys(allStorageKeys).forEach(key => {
+        if (key.startsWith(`rc_resolved_comments_${expositionId}_`)) {
+            const weaveId = key.replace(`rc_resolved_comments_${expositionId}_`, '');
+            const resolvedData = allStorageKeys[key];
+            if (resolvedData && Object.keys(resolvedData).length > 0) {
+                resolvedComments[weaveId] = resolvedData;
+                // Count total resolved comments
+                Object.values(resolvedData).forEach(toolComments => {
+                    totalResolvedComments += toolComments.length;
+                });
+            }
+        }
+    });
+    
     // Calculate totals from the stored data (suggestions are already attached to tools)
     let totalTools = 0;
     let totalSuggestions = 0;
@@ -543,9 +563,11 @@ async function saveAllToolsAsJSON() {
             exportTimestamp: new Date().toISOString(),
             totalWeaves: Object.keys(expositionData.weaves).length,
             totalTools: totalTools,
-            totalSuggestions: totalSuggestions
+            totalSuggestions: totalSuggestions,
+            totalResolvedComments: totalResolvedComments
         },
-        weaves: expositionData.weaves  // Use the weaves data as-is since it already contains suggestions
+        weaves: expositionData.weaves, // Use the weaves data as-is since it already contains suggestions
+        resolvedComments: resolvedComments // Add resolved comments data
     };
     
     // Create downloadable JSON file
@@ -562,11 +584,11 @@ async function saveAllToolsAsJSON() {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
     
-    // Show confirmation
+    // Show confirmation message with resolved comments info
     const weaveCount = Object.keys(expositionData.weaves).length;
     const toolCount = Object.values(expositionData.weaves).reduce((sum, weave) => sum + weave.tools.length, 0);
-    const suggestionCount = suggestions.length;
-    showNotification(`Saved ${toolCount} tools and ${suggestionCount} suggestions from ${weaveCount} weaves`);
+    const activeResolvedText = totalResolvedComments > 0 ? `, ${totalResolvedComments} resolved comments` : '';
+    showNotification(`Saved ${toolCount} tools, ${totalSuggestions} active suggestions${activeResolvedText} from ${weaveCount} weaves`);
 }
 
 // Function to save tools as JSON (legacy - keeping for backwards compatibility)
@@ -1941,13 +1963,41 @@ function showSuggestionTooltip(spanElement, suggestionText, selectedText, type =
     const textColor = type === 'comment' ? 'white' : '#333';
     const contentClass = type === 'comment' ? 'rc-comment-tooltip-suggestion' : 'rc-suggestion-tooltip-suggestion';
     
+    // Add "Resolved" button for comments
+    const resolvedButton = type === 'comment' ? `
+        <div style="margin-top: 8px; text-align: right;">
+            <button class="rc-resolve-comment-btn" style="background: #4CAF50; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold;">
+                Resolved
+            </button>
+        </div>
+    ` : '';
+    
     tooltip.innerHTML = `
         <div class="rc-suggestion-tooltip-header" style="background: ${bgColor}; color: ${textColor};">${header}</div>
         <div class="rc-suggestion-tooltip-text"><strong>Selected:</strong> "${selectedText}"</div>
         <div class="${contentClass}">${suggestionText}</div>
+        ${resolvedButton}
     `;
     
     document.body.appendChild(tooltip);
+    
+    // Add click handler for "Resolved" button if it's a comment
+    if (type === 'comment') {
+        const resolveBtn = tooltip.querySelector('.rc-resolve-comment-btn');
+        if (resolveBtn) {
+            resolveBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                try {
+                    await resolveComment(spanElement);
+                    tooltip.remove();
+                    showNotification('Comment resolved and removed');
+                } catch (error) {
+                    console.error('Error resolving comment:', error);
+                    showNotification('Error resolving comment: ' + error.message);
+                }
+            });
+        }
+    }
     
     // Position tooltip near the span
     const spanRect = spanElement.getBoundingClientRect();
@@ -1980,6 +2030,302 @@ function showSuggestionTooltip(spanElement, suggestionText, selectedText, type =
     setTimeout(() => {
         document.addEventListener('click', closeTooltip);
     }, 100);
+}
+
+// Function to resolve a comment by removing the span and updating the tool
+async function resolveComment(spanElement) {
+    try {
+        // Get span information BEFORE removing it from DOM
+        const spanId = spanElement.id;
+        const spanType = spanElement.getAttribute('data-type');
+        const spanText = spanElement.textContent;
+        
+        if (spanType !== 'comment') {
+            throw new Error('Only comments can be resolved');
+        }
+        
+        // Find the parent tool
+        const tool = spanElement.closest('.tool-text, .tool-simpletext');
+        if (!tool) {
+            throw new Error('Could not find parent tool');
+        }
+        
+        const toolId = tool.dataset.id;
+        if (!toolId) {
+            throw new Error('Tool ID not found');
+        }
+        
+        console.log(`🔄 Resolving comment ${spanId} in tool ${toolId}`);
+        
+        // Store span info for RC update before DOM modification
+        const spanInfo = {
+            id: spanId,
+            text: spanText,
+            outerHTML: spanElement.outerHTML
+        };
+        
+        // Remove the span from DOM and unwrap its content
+        const textNode = document.createTextNode(spanElement.textContent);
+        spanElement.parentNode.replaceChild(textNode, spanElement);
+        
+        console.log(`✂️ Removed span ${spanId} from DOM`);
+        
+        // Remove from active suggestions storage and move to resolved comments storage
+        const bodyElement = document.body;
+        const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
+        const weaveId = bodyElement.dataset.weave || extractFromUrl('weave') || 'unknown';
+        const storageKey = `rc_suggestions_${expositionId}_${weaveId}`;
+        const resolvedStorageKey = `rc_resolved_comments_${expositionId}_${weaveId}`;
+        
+        const result = await browser.storage.local.get([storageKey, resolvedStorageKey]);
+        const suggestions = result[storageKey] || {};
+        const resolvedComments = result[resolvedStorageKey] || {};
+        const toolSuggestions = suggestions[toolId] || [];
+        
+        // Find the comment to resolve
+        const commentToResolve = toolSuggestions.find(s => s.spanId === spanId);
+        if (commentToResolve) {
+            // Add resolution metadata
+            commentToResolve.resolvedAt = new Date().toISOString();
+            commentToResolve.resolvedBySpanRemoval = true;
+            commentToResolve.originalSpanInfo = spanInfo;
+            
+            // Move to resolved comments storage
+            if (!resolvedComments[toolId]) {
+                resolvedComments[toolId] = [];
+            }
+            resolvedComments[toolId].push(commentToResolve);
+            
+            console.log(`📦 Moved comment ${spanId} to resolved storage with metadata`);
+        }
+        
+        // Remove the comment from active suggestions
+        const updatedSuggestions = toolSuggestions.filter(s => s.spanId !== spanId);
+        suggestions[toolId] = updatedSuggestions;
+        
+        // Save both storages
+        await browser.storage.local.set({ 
+            [storageKey]: suggestions,
+            [resolvedStorageKey]: resolvedComments
+        });
+        
+        console.log(`🗑️ Removed comment ${spanId} from active storage`);
+        console.log(`💾 Stored resolved comment ${spanId} with resolution metadata`);
+        
+        // Update the tool via RC API (pass spanInfo for proper removal)
+        await updateToolAfterCommentResolution(tool, toolId, spanInfo);
+        
+        // Update the suggestion badge count
+        await updateToolWithSuggestionCount(tool);
+        
+        console.log(`✅ Comment ${spanId} resolved successfully`);
+        
+    } catch (error) {
+        console.error('❌ Error in resolveComment:', error);
+        throw error;
+    }
+}
+
+// Function to retrieve resolved comments for a tool or entire weave
+async function getResolvedComments(toolId = null) {
+    try {
+        const bodyElement = document.body;
+        const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
+        const weaveId = bodyElement.dataset.weave || extractFromUrl('weave') || 'unknown';
+        const resolvedStorageKey = `rc_resolved_comments_${expositionId}_${weaveId}`;
+        
+        const result = await browser.storage.local.get(resolvedStorageKey);
+        const resolvedComments = result[resolvedStorageKey] || {};
+        
+        if (toolId) {
+            // Return resolved comments for specific tool
+            return resolvedComments[toolId] || [];
+        } else {
+            // Return all resolved comments for the weave
+            return resolvedComments;
+        }
+    } catch (error) {
+        console.error('Error retrieving resolved comments:', error);
+        return toolId ? [] : {};
+    }
+}
+
+// Function to get resolution statistics
+async function getResolutionStats() {
+    try {
+        const bodyElement = document.body;
+        const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
+        const weaveId = bodyElement.dataset.weave || extractFromUrl('weave') || 'unknown';
+        const resolvedStorageKey = `rc_resolved_comments_${expositionId}_${weaveId}`;
+        
+        const result = await browser.storage.local.get(resolvedStorageKey);
+        const resolvedComments = result[resolvedStorageKey] || {};
+        
+        let totalResolved = 0;
+        let resolutionsByTool = {};
+        let resolutionsByDate = {};
+        
+        Object.entries(resolvedComments).forEach(([toolId, comments]) => {
+            resolutionsByTool[toolId] = comments.length;
+            totalResolved += comments.length;
+            
+            comments.forEach(comment => {
+                if (comment.resolvedAt) {
+                    const dateKey = comment.resolvedAt.split('T')[0]; // Get just the date part
+                    resolutionsByDate[dateKey] = (resolutionsByDate[dateKey] || 0) + 1;
+                }
+            });
+        });
+        
+        return {
+            totalResolved,
+            resolutionsByTool,
+            resolutionsByDate,
+            weaveId,
+            expositionId
+        };
+    } catch (error) {
+        console.error('Error getting resolution stats:', error);
+        return null;
+    }
+}
+
+// Function to update the tool content after comment resolution
+async function updateToolAfterCommentResolution(tool, toolId, spanInfo) {
+    try {
+        console.log(`🔄 Updating RC tool ${toolId} after comment resolution...`);
+        
+        const bodyElement = document.body;
+        const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
+        const weaveId = bodyElement.dataset.weave || extractFromUrl('weave') || 'unknown';
+        
+        // Step 1: Fetch current tool content from Research Catalogue
+        const editUrl = `${window.location.origin}/item/edit?item=${toolId}&research=${expositionId}`;
+        const editResponse = await fetch(editUrl, {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        
+        if (!editResponse.ok) {
+            throw new Error(`Failed to fetch tool data: ${editResponse.status}`);
+        }
+        
+        const editHtml = await editResponse.text();
+        console.log('📥 Fetched tool edit form from RC');
+        
+        // Step 2: Parse the form and extract current content
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(editHtml, 'text/html');
+        
+        // Find the content field (could be different names depending on tool type)
+        const contentField = doc.querySelector('textarea[name="media[textcontent]"]') ||
+                           doc.querySelector('textarea[name="media[content]"]') ||
+                           doc.querySelector('textarea[name="textcontent"]');
+        
+        if (!contentField) {
+            throw new Error('Could not find content field in tool edit form');
+        }
+        
+        let currentContent = contentField.value;
+        console.log('📄 Current tool content length:', currentContent.length);
+        
+        // Step 3: Remove the resolved comment span from the content
+        if (spanInfo && spanInfo.id) {
+            // Use regex to remove the span while preserving its text content
+            const spanRegex = new RegExp(`<span[^>]*id="${spanInfo.id}"[^>]*>(.*?)</span>`, 'gi');
+            const updatedContent = currentContent.replace(spanRegex, '$1');
+            
+            if (updatedContent !== currentContent) {
+                console.log('✂️ Removed resolved comment span from RC content');
+                currentContent = updatedContent;
+            } else {
+                console.log('⚠️ Comment span not found in RC content - may have been removed already');
+            }
+        }
+        
+        // Step 4: Prepare form data for update
+        const formData = new URLSearchParams();
+        
+        // Copy all existing form fields from the edit form
+        const formElements = doc.querySelectorAll('input, textarea, select');
+        formElements.forEach(element => {
+            if (element.name && element.name !== 'media[textcontent]' && element.name !== 'media[content]') {
+                if (element.type === 'checkbox' || element.type === 'radio') {
+                    if (element.checked) {
+                        formData.append(element.name, element.value);
+                    }
+                } else if (element.type !== 'submit' && element.type !== 'button') {
+                    formData.append(element.name, element.value);
+                }
+            }
+        });
+        
+        // Set the updated content
+        const contentFieldName = contentField.name;
+        formData.set(contentFieldName, currentContent);
+        
+        // Add submit button
+        if (!formData.has('submitbutton')) {
+            formData.append('submitbutton', 'submitbutton');
+        }
+        
+        console.log('📤 Sending update request to RC...');
+        
+        // Step 5: Submit the update to Research Catalogue
+        const updateUrl = `${window.location.origin}/item/edit?item=${toolId}&research=${expositionId}`;
+        const updateResponse = await fetch(updateUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: formData.toString()
+        });
+        
+        if (!updateResponse.ok) {
+            throw new Error(`Failed to update tool: ${updateResponse.status}`);
+        }
+        
+        // Check if update was successful
+        const hasValidationHeader = updateResponse.headers.get('Form-Validation');
+        if (hasValidationHeader === '1') {
+            console.log('✅ RC tool updated successfully after comment resolution!');
+            
+            // Step 6: Update our local storage to reflect the changes
+            const storageKey = `rc_exposition_${expositionId}`;
+            const result = await browser.storage.local.get(storageKey);
+            const expositionData = result[storageKey];
+            
+            if (expositionData && expositionData.weaves && expositionData.weaves[weaveId]) {
+                const weaveData = expositionData.weaves[weaveId];
+                const toolData = weaveData.tools.find(t => t.id === toolId);
+                
+                if (toolData && toolData.content) {
+                    // Update stored content to match what we sent to RC
+                    toolData.content.htmlSpan = currentContent;
+                    await browser.storage.local.set({ [storageKey]: expositionData });
+                    console.log('💾 Updated local storage with resolved comment changes');
+                }
+            }
+            
+            // Re-store tools to update suggestion counts in export data
+            const allTextTools = document.querySelectorAll('.tool-text, .tool-simpletext');
+            if (allTextTools.length > 0) {
+                await storeToolsInMemory(Array.from(allTextTools));
+            }
+            
+        } else {
+            throw new Error('RC update validation failed');
+        }
+        
+        console.log(`✅ Tool ${toolId} successfully updated on Research Catalogue`);
+        
+    } catch (error) {
+        console.error('❌ Error updating RC tool after comment resolution:', error);
+        throw error;
+    }
 }
 
 // Function to show notification
