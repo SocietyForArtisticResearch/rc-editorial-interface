@@ -1928,21 +1928,23 @@ async function addClickHandlerFromStorage(span, toolId) {
 // Function to show suggestion or comment tooltip
 function showSuggestionTooltip(spanElement, suggestionText, selectedText, type = 'suggestion') {
     // Remove any existing tooltips
-    const existingTooltips = document.querySelectorAll('.rc-suggestion-tooltip');
+    const existingTooltips = document.querySelectorAll('.rc-suggestion-tooltip, .rc-comment-tooltip');
     existingTooltips.forEach(tooltip => tooltip.remove());
     
     // Create tooltip element
     const tooltip = document.createElement('div');
-    tooltip.className = 'rc-suggestion-tooltip';
+    const tooltipClass = type === 'comment' ? 'rc-comment-tooltip' : 'rc-suggestion-tooltip';
+    tooltip.className = tooltipClass;
     
     const header = type === 'comment' ? 'Comment' : 'Suggestion';
     const bgColor = type === 'comment' ? '#4CAF50' : '#FFC107';
     const textColor = type === 'comment' ? 'white' : '#333';
+    const contentClass = type === 'comment' ? 'rc-comment-tooltip-suggestion' : 'rc-suggestion-tooltip-suggestion';
     
     tooltip.innerHTML = `
         <div class="rc-suggestion-tooltip-header" style="background: ${bgColor}; color: ${textColor};">${header}</div>
         <div class="rc-suggestion-tooltip-text"><strong>Selected:</strong> "${selectedText}"</div>
-        <div class="rc-suggestion-tooltip-suggestion">${suggestionText}</div>
+        <div class="${contentClass}">${suggestionText}</div>
     `;
     
     document.body.appendChild(tooltip);
