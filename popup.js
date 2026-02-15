@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Handle "Open Research Catalogue" button
     openRCButton.addEventListener('click', () => {
         browser.tabs.create({ 
-            url: 'https://www.researchcatalogue.net/portal/expositions' 
+            url: 'https://www.researchcatalogue.net/' 
         });
         window.close();
     });
