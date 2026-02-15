@@ -525,24 +525,54 @@ async function saveAllToolsAsJSON() {
     
     console.log('RC Tool Commenter: Exporting exposition data:', expositionData);
     
-    // Get all resolved comments for all weaves in this exposition
+    // Get all resolved comments and accepted suggestions for all weaves in this exposition
     const allStorageKeys = await browser.storage.local.get();
     const resolvedComments = {};
+    const acceptedSuggestions = {};
     let totalResolvedComments = 0;
+    let totalAcceptedSuggestions = 0;
     
-    // Find all resolved comments storage keys for this exposition
+    console.log('🔍 Searching for resolved comments and accepted suggestions...');
+    console.log('All storage keys:', Object.keys(allStorageKeys).filter(k => k.startsWith('rc_')));
+    
+    // Find all resolved comments and accepted suggestions storage keys for this exposition
     Object.keys(allStorageKeys).forEach(key => {
         if (key.startsWith(`rc_resolved_comments_${expositionId}_`)) {
             const weaveId = key.replace(`rc_resolved_comments_${expositionId}_`, '');
             const resolvedData = allStorageKeys[key];
-            if (resolvedData && Object.keys(resolvedData).length > 0) {
+            console.log(`📦 Found resolved comments for weave ${weaveId}:`, resolvedData);
+            console.log(`📦 Resolved data type:`, typeof resolvedData, 'keys:', Object.keys(resolvedData || {}));
+            if (resolvedData && typeof resolvedData === 'object' && Object.keys(resolvedData).length > 0) {
                 resolvedComments[weaveId] = resolvedData;
                 // Count total resolved comments
                 Object.values(resolvedData).forEach(toolComments => {
-                    totalResolvedComments += toolComments.length;
+                    if (Array.isArray(toolComments)) {
+                        totalResolvedComments += toolComments.length;
+                    }
+                });
+            }
+        } else if (key.startsWith(`rc_accepted_suggestions_${expositionId}_`)) {
+            const weaveId = key.replace(`rc_accepted_suggestions_${expositionId}_`, '');
+            const acceptedData = allStorageKeys[key];
+            console.log(`📦 Found accepted suggestions for weave ${weaveId}:`, acceptedData);
+            console.log(`📦 Accepted data type:`, typeof acceptedData, 'keys:', Object.keys(acceptedData || {}));
+            if (acceptedData && typeof acceptedData === 'object' && Object.keys(acceptedData).length > 0) {
+                acceptedSuggestions[weaveId] = acceptedData;
+                // Count total accepted suggestions
+                Object.values(acceptedData).forEach(toolSuggestions => {
+                    if (Array.isArray(toolSuggestions)) {
+                        totalAcceptedSuggestions += toolSuggestions.length;
+                    }
                 });
             }
         }
+    });
+    
+    console.log('📊 Export totals:', {
+        totalResolvedComments,
+        totalAcceptedSuggestions,
+        resolvedComments,
+        acceptedSuggestions
     });
     
     // Calculate totals from the stored data (suggestions are already attached to tools)
@@ -564,10 +594,12 @@ async function saveAllToolsAsJSON() {
             totalWeaves: Object.keys(expositionData.weaves).length,
             totalTools: totalTools,
             totalSuggestions: totalSuggestions,
-            totalResolvedComments: totalResolvedComments
+            totalResolvedComments: totalResolvedComments,
+            totalAcceptedSuggestions: totalAcceptedSuggestions
         },
         weaves: expositionData.weaves, // Use the weaves data as-is since it already contains suggestions
-        resolvedComments: resolvedComments // Add resolved comments data
+        resolvedComments: resolvedComments, // Add resolved comments data
+        acceptedSuggestions: acceptedSuggestions // Add accepted suggestions data
     };
     
     // Create downloadable JSON file
@@ -584,11 +616,20 @@ async function saveAllToolsAsJSON() {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
     
-    // Show confirmation message with resolved comments info
+    // Show confirmation message with resolved comments and accepted suggestions info
     const weaveCount = Object.keys(expositionData.weaves).length;
     const toolCount = Object.values(expositionData.weaves).reduce((sum, weave) => sum + weave.tools.length, 0);
-    const activeResolvedText = totalResolvedComments > 0 ? `, ${totalResolvedComments} resolved comments` : '';
-    showNotification(`Saved ${toolCount} tools, ${totalSuggestions} active suggestions${activeResolvedText} from ${weaveCount} weaves`);
+    let statusMessage = `Saved ${toolCount} tools, ${totalSuggestions} active suggestions`;
+    
+    if (totalResolvedComments > 0 || totalAcceptedSuggestions > 0) {
+        const resolvedText = totalResolvedComments > 0 ? `${totalResolvedComments} resolved comments` : '';
+        const acceptedText = totalAcceptedSuggestions > 0 ? `${totalAcceptedSuggestions} accepted suggestions` : '';
+        const combinedText = [resolvedText, acceptedText].filter(Boolean).join(', ');
+        statusMessage += `, ${combinedText}`;
+    }
+    
+    statusMessage += ` from ${weaveCount} weaves`;
+    showNotification(statusMessage);
 }
 
 // Function to save tools as JSON (legacy - keeping for backwards compatibility)
@@ -1949,6 +1990,26 @@ async function addClickHandlerFromStorage(span, toolId) {
 
 // Function to show suggestion or comment tooltip
 function showSuggestionTooltip(spanElement, suggestionText, selectedText, type = 'suggestion') {
+    // Verify the type matches the span's actual data-type attribute, with fallback to CSS class
+    let actualType = spanElement.getAttribute('data-type');
+    
+    // Fallback: infer type from CSS class if data-type is missing
+    if (!actualType) {
+        if (spanElement.classList.contains('rc-comment-highlight')) {
+            actualType = 'comment';
+        } else if (spanElement.classList.contains('rc-suggestion-highlight')) {
+            actualType = 'suggestion';
+        } else {
+            actualType = 'suggestion'; // Default fallback
+        }
+        console.log(`ℹ️ Inferred span type '${actualType}' from CSS class for tooltip`);
+    }
+    
+    if (actualType !== type) {
+        console.warn(`Type mismatch: passed type '${type}' but span has actual type '${actualType}'. Using actual type.`);
+        type = actualType; // Use the span's actual type
+    }
+    
     // Remove any existing tooltips
     const existingTooltips = document.querySelectorAll('.rc-suggestion-tooltip, .rc-comment-tooltip');
     existingTooltips.forEach(tooltip => tooltip.remove());
@@ -1963,20 +2024,26 @@ function showSuggestionTooltip(spanElement, suggestionText, selectedText, type =
     const textColor = type === 'comment' ? 'white' : '#333';
     const contentClass = type === 'comment' ? 'rc-comment-tooltip-suggestion' : 'rc-suggestion-tooltip-suggestion';
     
-    // Add "Resolved" button for comments
-    const resolvedButton = type === 'comment' ? `
+    // Add "Resolved" button for comments or "Accept" button for suggestions
+    const actionButton = type === 'comment' ? `
         <div style="margin-top: 8px; text-align: right;">
             <button class="rc-resolve-comment-btn" style="background: #4CAF50; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold;">
                 Resolved
             </button>
         </div>
-    ` : '';
+    ` : `
+        <div style="margin-top: 8px; text-align: right;">
+            <button class="rc-accept-suggestion-btn" style="background: #4CAF50; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold;">
+                Accept
+            </button>
+        </div>
+    `;
     
     tooltip.innerHTML = `
         <div class="rc-suggestion-tooltip-header" style="background: ${bgColor}; color: ${textColor};">${header}</div>
         <div class="rc-suggestion-tooltip-text"><strong>Selected:</strong> "${selectedText}"</div>
         <div class="${contentClass}">${suggestionText}</div>
-        ${resolvedButton}
+        ${actionButton}
     `;
     
     document.body.appendChild(tooltip);
@@ -1994,6 +2061,29 @@ function showSuggestionTooltip(spanElement, suggestionText, selectedText, type =
                 } catch (error) {
                     console.error('Error resolving comment:', error);
                     showNotification('Error resolving comment: ' + error.message);
+                }
+            });
+        }
+    }
+    
+    // Add click handler for "Accept" button if it's a suggestion
+    if (type === 'suggestion') {
+        const acceptBtn = tooltip.querySelector('.rc-accept-suggestion-btn');
+        if (acceptBtn) {
+            acceptBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                try {
+                    // Double-check that this is actually a suggestion span
+                    const actualType = spanElement.getAttribute('data-type') || 'suggestion';
+                    if (actualType !== 'suggestion') {
+                        throw new Error(`Cannot accept ${actualType}, only suggestions can be accepted`);
+                    }
+                    await acceptSuggestion(spanElement);
+                    tooltip.remove();
+                    showNotification('Suggestion accepted and applied');
+                } catch (error) {
+                    console.error('Error accepting suggestion:', error);
+                    showNotification('Error accepting suggestion: ' + error.message);
                 }
             });
         }
@@ -2037,7 +2127,20 @@ async function resolveComment(spanElement) {
     try {
         // Get span information BEFORE removing it from DOM
         const spanId = spanElement.id;
-        const spanType = spanElement.getAttribute('data-type');
+        let spanType = spanElement.getAttribute('data-type');
+        
+        // Fallback: infer type from CSS class if data-type is missing
+        if (!spanType) {
+            if (spanElement.classList.contains('rc-comment-highlight')) {
+                spanType = 'comment';
+            } else if (spanElement.classList.contains('rc-suggestion-highlight')) {
+                spanType = 'suggestion';
+            } else {
+                spanType = 'comment'; // Default fallback
+            }
+            console.log(`ℹ️ Inferred span type '${spanType}' from CSS class for span ${spanId}`);
+        }
+        
         const spanText = spanElement.textContent;
         
         if (spanType !== 'comment') {
@@ -2190,6 +2293,121 @@ async function getResolutionStats() {
     }
 }
 
+// Function to accept a suggestion by replacing the original text with the suggested text
+async function acceptSuggestion(spanElement) {
+    try {
+        // Get span information BEFORE removing it from DOM
+        const spanId = spanElement.id;
+        let spanType = spanElement.getAttribute('data-type');
+        
+        // Fallback: infer type from CSS class if data-type is missing
+        if (!spanType) {
+            if (spanElement.classList.contains('rc-comment-highlight')) {
+                spanType = 'comment';
+            } else if (spanElement.classList.contains('rc-suggestion-highlight')) {
+                spanType = 'suggestion';
+            } else {
+                spanType = 'suggestion'; // Default fallback
+            }
+            console.log(`ℹ️ Inferred span type '${spanType}' from CSS class for span ${spanId}`);
+        }
+        
+        const originalText = spanElement.getAttribute('data-selected-text');
+        const suggestedText = spanElement.getAttribute('data-suggestion');
+        
+        if (spanType !== 'suggestion') {
+            throw new Error('Only suggestions can be accepted');
+        }
+        
+        if (!suggestedText) {
+            throw new Error('Missing suggested text data in span');
+        }
+        
+        console.log(`📝 Will replace "${originalText || spanElement.textContent}" with "${suggestedText}"`);
+        
+        // Find the parent tool
+        const tool = spanElement.closest('.tool-text, .tool-simpletext');
+        if (!tool) {
+            throw new Error('Could not find parent tool');
+        }
+        
+        const toolId = tool.dataset.id;
+        if (!toolId) {
+            throw new Error('Tool ID not found');
+        }
+        
+        console.log(`🔄 Accepting suggestion ${spanId} in tool ${toolId}`);
+        
+        // Store span info for RC update before DOM modification
+        const spanInfo = {
+            id: spanId,
+            originalText: originalText || spanElement.textContent,
+            suggestedText: suggestedText,
+            outerHTML: spanElement.outerHTML
+        };
+        
+        // Replace the span content with the suggested text (no highlighting)
+        const textNode = document.createTextNode(suggestedText);
+        spanElement.parentNode.replaceChild(textNode, spanElement);
+        
+        console.log(`✂️ Replaced span ${spanId} with suggested text in DOM`);
+        
+        // Remove from active suggestions storage and move to accepted suggestions storage
+        const bodyElement = document.body;
+        const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
+        const weaveId = bodyElement.dataset.weave || extractFromUrl('weave') || 'unknown';
+        const storageKey = `rc_suggestions_${expositionId}_${weaveId}`;
+        const acceptedStorageKey = `rc_accepted_suggestions_${expositionId}_${weaveId}`;
+        
+        const result = await browser.storage.local.get([storageKey, acceptedStorageKey]);
+        const suggestions = result[storageKey] || {};
+        const acceptedSuggestions = result[acceptedStorageKey] || {};
+        const toolSuggestions = suggestions[toolId] || [];
+        
+        // Find the suggestion to accept
+        const suggestionToAccept = toolSuggestions.find(s => s.spanId === spanId);
+        if (suggestionToAccept) {
+            // Add acceptance metadata
+            suggestionToAccept.acceptedAt = new Date().toISOString();
+            suggestionToAccept.acceptedByTextReplacement = true;
+            suggestionToAccept.originalSpanInfo = spanInfo;
+            
+            // Move to accepted suggestions storage
+            if (!acceptedSuggestions[toolId]) {
+                acceptedSuggestions[toolId] = [];
+            }
+            acceptedSuggestions[toolId].push(suggestionToAccept);
+            
+            console.log(`📦 Moved suggestion ${spanId} to accepted storage with metadata`);
+        }
+        
+        // Remove the suggestion from active suggestions
+        const updatedSuggestions = toolSuggestions.filter(s => s.spanId !== spanId);
+        suggestions[toolId] = updatedSuggestions;
+        
+        // Save both storages
+        await browser.storage.local.set({ 
+            [storageKey]: suggestions,
+            [acceptedStorageKey]: acceptedSuggestions
+        });
+        
+        console.log(`🗑️ Removed suggestion ${spanId} from active storage`);
+        console.log(`💾 Stored accepted suggestion ${spanId} with acceptance metadata`);
+        
+        // Update the tool via RC API (pass spanInfo for proper text replacement)
+        await updateToolAfterSuggestionAcceptance(tool, toolId, spanInfo);
+        
+        // Update the suggestion badge count
+        await updateToolWithSuggestionCount(tool);
+        
+        console.log(`✅ Suggestion ${spanId} accepted successfully`);
+        
+    } catch (error) {
+        console.error('❌ Error in acceptSuggestion:', error);
+        throw error;
+    }
+}
+
 // Function to update the tool content after comment resolution
 async function updateToolAfterCommentResolution(tool, toolId, spanInfo) {
     try {
@@ -2324,6 +2542,145 @@ async function updateToolAfterCommentResolution(tool, toolId, spanInfo) {
         
     } catch (error) {
         console.error('❌ Error updating RC tool after comment resolution:', error);
+        throw error;
+    }
+}
+
+// Function to update the tool content after suggestion acceptance
+async function updateToolAfterSuggestionAcceptance(tool, toolId, spanInfo) {
+    try {
+        console.log(`🔄 Updating RC tool ${toolId} after suggestion acceptance...`);
+        
+        const bodyElement = document.body;
+        const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
+        const weaveId = bodyElement.dataset.weave || extractFromUrl('weave') || 'unknown';
+        
+        // Step 1: Fetch current tool content from Research Catalogue
+        const editUrl = `${window.location.origin}/item/edit?item=${toolId}&research=${expositionId}`;
+        const editResponse = await fetch(editUrl, {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        
+        if (!editResponse.ok) {
+            throw new Error(`Failed to fetch tool data: ${editResponse.status}`);
+        }
+        
+        const editHtml = await editResponse.text();
+        console.log('📥 Fetched tool edit form from RC');
+        
+        // Step 2: Parse the form and extract current content
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(editHtml, 'text/html');
+        
+        // Find the content field (could be different names depending on tool type)
+        const contentField = doc.querySelector('textarea[name="media[textcontent]"]') ||
+                           doc.querySelector('textarea[name="media[content]"]') ||
+                           doc.querySelector('textarea[name="textcontent"]');
+        
+        if (!contentField) {
+            throw new Error('Could not find content field in tool edit form');
+        }
+        
+        let currentContent = contentField.value;
+        console.log('📄 Current tool content length:', currentContent.length);
+        
+        // Step 3: Replace the suggestion span with the accepted text
+        if (spanInfo && spanInfo.id) {
+            // Use regex to replace the span with the suggested text
+            const spanRegex = new RegExp(`<span[^>]*id="${spanInfo.id}"[^>]*>(.*?)</span>`, 'gi');
+            const updatedContent = currentContent.replace(spanRegex, spanInfo.suggestedText);
+            
+            if (updatedContent !== currentContent) {
+                console.log('✅ Applied accepted suggestion to RC content');
+                console.log(`📝 Replaced span with: "${spanInfo.suggestedText}"`);
+                currentContent = updatedContent;
+            } else {
+                console.log('⚠️ Suggestion span not found in RC content - may have been modified already');
+            }
+        }
+        
+        // Step 4: Prepare form data for update
+        const formData = new URLSearchParams();
+        
+        // Copy all existing form fields from the edit form
+        const formElements = doc.querySelectorAll('input, textarea, select');
+        formElements.forEach(element => {
+            if (element.name && element.name !== 'media[textcontent]' && element.name !== 'media[content]') {
+                if (element.type === 'checkbox' || element.type === 'radio') {
+                    if (element.checked) {
+                        formData.append(element.name, element.value);
+                    }
+                } else if (element.type !== 'submit' && element.type !== 'button') {
+                    formData.append(element.name, element.value);
+                }
+            }
+        });
+        
+        // Set the updated content
+        const contentFieldName = contentField.name;
+        formData.set(contentFieldName, currentContent);
+        
+        // Add submit button
+        if (!formData.has('submitbutton')) {
+            formData.append('submitbutton', 'submitbutton');
+        }
+        
+        console.log('📤 Sending update request to RC...');
+        
+        // Step 5: Submit the update to Research Catalogue
+        const updateUrl = `${window.location.origin}/item/edit?item=${toolId}&research=${expositionId}`;
+        const updateResponse = await fetch(updateUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: formData.toString()
+        });
+        
+        if (!updateResponse.ok) {
+            throw new Error(`Failed to update tool: ${updateResponse.status}`);
+        }
+        
+        // Check if update was successful
+        const hasValidationHeader = updateResponse.headers.get('Form-Validation');
+        if (hasValidationHeader === '1') {
+            console.log('✅ RC tool updated successfully after suggestion acceptance!');
+            
+            // Step 6: Update our local storage to reflect the changes
+            const storageKey = `rc_exposition_${expositionId}`;
+            const result = await browser.storage.local.get(storageKey);
+            const expositionData = result[storageKey];
+            
+            if (expositionData && expositionData.weaves && expositionData.weaves[weaveId]) {
+                const weaveData = expositionData.weaves[weaveId];
+                const toolData = weaveData.tools.find(t => t.id === toolId);
+                
+                if (toolData && toolData.content) {
+                    // Update stored content to match what we sent to RC
+                    toolData.content.htmlSpan = currentContent;
+                    await browser.storage.local.set({ [storageKey]: expositionData });
+                    console.log('💾 Updated local storage with accepted suggestion changes');
+                }
+            }
+            
+            // Re-store tools to update suggestion counts in export data
+            const allTextTools = document.querySelectorAll('.tool-text, .tool-simpletext');
+            if (allTextTools.length > 0) {
+                await storeToolsInMemory(Array.from(allTextTools));
+            }
+            
+        } else {
+            throw new Error('RC update validation failed');
+        }
+        
+        console.log(`✅ Tool ${toolId} successfully updated on Research Catalogue with accepted suggestion`);
+        
+    } catch (error) {
+        console.error('❌ Error updating RC tool after suggestion acceptance:', error);
         throw error;
     }
 }
