@@ -830,6 +830,21 @@
     box-shadow: 0 2px 4px rgba(255, 193, 7, 0.3) !important;
 }
 
+/* Comment highlight spans in text content */
+.rc-comment-highlight {
+    background-color: rgba(76, 175, 80, 0.3) !important;
+    border-bottom: 2px solid #4CAF50 !important;
+    border-radius: 2px !important;
+    padding: 1px 2px !important;
+    transition: background-color 0.2s ease !important;
+    cursor: pointer !important;
+}
+
+.rc-comment-highlight:hover {
+    background-color: rgba(76, 175, 80, 0.5) !important;
+    box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3) !important;
+}
+
 /* Suggestion popup tooltip */
 .rc-suggestion-tooltip {
     position: absolute !important;

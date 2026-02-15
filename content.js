@@ -233,8 +233,8 @@ function removeExistingSuggestionSpans(html) {
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = html;
     
-    // Find all suggestion spans and replace them with their text content
-    const suggestionSpans = tempDiv.querySelectorAll('.rc-suggestion-highlight');
+    // Find all suggestion and comment spans and replace them with their text content
+    const suggestionSpans = tempDiv.querySelectorAll('.rc-suggestion-highlight, .rc-comment-highlight');
     suggestionSpans.forEach(span => {
         // Replace the span with its text content
         const textNode = document.createTextNode(span.textContent);
@@ -268,7 +268,7 @@ function extractToolContent(tool) {
         const textContent = tool.querySelector('.html-text-editor-content');
         if (textContent) {
             const currentHtml = textContent.innerHTML.trim();
-            const hasSpansNow = currentHtml.includes('rc-suggestion-highlight');
+            const hasSpansNow = currentHtml.includes('rc-suggestion-highlight') || currentHtml.includes('rc-comment-highlight');
             
             // Get the original HTML by removing any existing suggestion spans
             const originalHtml = removeExistingSuggestionSpans(currentHtml);
@@ -1433,11 +1433,12 @@ function createTextSuggestionInterface(tool, clickX, clickY) {
                     <div class="rc-selected-text"></div>
                 </div>
                 <div class="rc-suggestion-input">
-                    <label for="rc-suggestion-text">Your suggestion:</label>
-                    <textarea id="rc-suggestion-text" placeholder="Suggest changes for the selected text..." rows="3"></textarea>
+                    <label for="rc-suggestion-text">Your comment or suggestion:</label>
+                    <textarea id="rc-suggestion-text" placeholder="Add a comment or suggest changes for the selected text..." rows="3"></textarea>
                 </div>
                 <div class="rc-suggestion-actions">
-                    <button class="rc-save-suggestion">Save Suggestion</button>
+                    <button class="rc-save-comment" style="background: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; margin-right: 8px;">Comment</button>
+                    <button class="rc-save-suggestion" style="background: #FFC107; color: #333; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; margin-right: 8px;">Suggest</button>
                     <button class="rc-cancel-suggestion">Cancel</button>
                 </div>
             </div>
@@ -1474,7 +1475,8 @@ function setupSuggestionEventHandlers(overlay, tool) {
     const suggestionForm = overlay.querySelector('.rc-suggestion-form');
     const selectedTextDisplay = overlay.querySelector('.rc-selected-text');
     const suggestionTextarea = overlay.querySelector('#rc-suggestion-text');
-    const saveBtn = overlay.querySelector('.rc-save-suggestion');
+    const saveCommentBtn = overlay.querySelector('.rc-save-comment');
+    const saveSuggestionBtn = overlay.querySelector('.rc-save-suggestion');
     const cancelBtn = overlay.querySelector('.rc-cancel-suggestion');
     
     let currentSelection = null;
@@ -1514,27 +1516,37 @@ function setupSuggestionEventHandlers(overlay, tool) {
     });
     
     // Save suggestion
-    saveBtn.addEventListener('click', async () => {
-        console.log('RC Tool Commenter: Save button clicked');
-        console.log('Current selection:', currentSelection);
-        console.log('Suggestion text:', suggestionTextarea.value.trim());
-        console.log('Tool:', tool);
+    saveSuggestionBtn.addEventListener('click', async () => {
+        await handleSaveAction(currentSelection, suggestionTextarea, tool, overlay, 'suggestion');
+    });
+    
+    // Save comment
+    saveCommentBtn.addEventListener('click', async () => {
+        await handleSaveAction(currentSelection, suggestionTextarea, tool, overlay, 'comment');
+    });
+    
+    // Helper function to handle save action
+    async function handleSaveAction(selection, textarea, toolElement, overlayElement, type) {
+        console.log(`RC Tool Commenter: Save ${type} button clicked`);
+        console.log('Current selection:', selection);
+        console.log(`${type} text:`, textarea.value.trim());
+        console.log('Tool:', toolElement);
         
-        if (!currentSelection || !suggestionTextarea.value.trim()) {
-            showNotification('Please select text and enter a suggestion');
+        if (!selection || !textarea.value.trim()) {
+            showNotification(`Please select text and enter a ${type}`);
             return;
         }
         
-        if (!tool) {
+        if (!toolElement) {
             showNotification('Error: No tool element found');
             return;
         }
         
         try {
-            await saveSuggestion(tool, currentSelection, suggestionTextarea.value.trim());
-            console.log('RC Tool Commenter: Suggestion saved successfully');
-            overlay.remove();
-            showNotification('Suggestion saved successfully');
+            await saveSuggestion(toolElement, selection, textarea.value.trim(), type);
+            console.log(`RC Tool Commenter: ${type} saved successfully`);
+            overlayElement.remove();
+            showNotification(`${type.charAt(0).toUpperCase() + type.slice(1)} saved successfully`);
             
             // Debug: Check if suggestion was actually stored
             const bodyElement = document.body;
@@ -1542,13 +1554,13 @@ function setupSuggestionEventHandlers(overlay, tool) {
             const weaveId = bodyElement.dataset.weave || extractFromUrl('weave') || 'unknown';
             const storageKey = `rc_suggestions_${expositionId}_${weaveId}`;
             const result = await browser.storage.local.get(storageKey);
-            console.log('RC Tool Commenter: Suggestions in storage after save:', result[storageKey]);
+            console.log(`RC Tool Commenter: ${type}s in storage after save:`, result[storageKey]);
             
         } catch (error) {
-            console.error('RC Tool Commenter: Error saving suggestion:', error);
-            showNotification('Error saving suggestion');
+            console.error(`RC Tool Commenter: Error saving ${type}:`, error);
+            showNotification(`Error saving ${type}`);
         }
-    });
+    }
     
     // Cancel suggestion
     cancelBtn.addEventListener('click', () => {
@@ -1603,8 +1615,8 @@ function clearHighlights(container) {
     });
 }
 
-// Function to save suggestion
-async function saveSuggestion(tool, selection, suggestionText) {
+// Function to save suggestion or comment
+async function saveSuggestion(tool, selection, suggestionText, type = 'suggestion') {
     const bodyElement = document.body;
     const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
     const weaveId = bodyElement.dataset.weave || extractFromUrl('weave') || 'unknown';
@@ -1613,8 +1625,8 @@ async function saveSuggestion(tool, selection, suggestionText) {
     const toolId = tool.dataset.id || 'unknown';
     const toolType = tool.dataset.tool || 'unknown';
     
-    // Generate unique span ID for this suggestion
-    const spanId = `rc-suggestion-${toolId}-${Date.now()}`;
+    // Generate unique span ID for this suggestion/comment
+    const spanId = `rc-${type}-${toolId}-${Date.now()}`;
     
     // Find the text content area within the tool
     const textContent = tool.querySelector('.html-text-editor-content');
@@ -1622,23 +1634,28 @@ async function saveSuggestion(tool, selection, suggestionText) {
         throw new Error('No text content area found in tool');
     }
     
+    // Determine CSS class based on type
+    const cssClass = type === 'comment' ? 'rc-comment-highlight' : 'rc-suggestion-highlight';
+    
     // Wrap the selected text in a span with the unique ID
     try {
         const span = document.createElement('span');
         span.id = spanId;
-        span.className = 'rc-suggestion-highlight';
+        span.className = cssClass;
         
-        // Store suggestion data directly in the span
+        // Store suggestion/comment data directly in the span
         span.setAttribute('data-suggestion', suggestionText);
         span.setAttribute('data-selected-text', selection.text);
+        span.setAttribute('data-type', type);
         
-        // Add click handler to show suggestion
+        // Add click handler to show suggestion/comment
         span.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
             const suggestion = this.getAttribute('data-suggestion');
             const selectedText = this.getAttribute('data-selected-text');
-            showSuggestionTooltip(this, suggestion, selectedText);
+            const spanType = this.getAttribute('data-type') || 'suggestion';
+            showSuggestionTooltip(this, suggestion, selectedText, spanType);
         });
         
         // Wrap the selected content using the range from the selection
@@ -1649,7 +1666,7 @@ async function saveSuggestion(tool, selection, suggestionText) {
             const toolText = textContent.innerHTML;
             const selectedText = selection.text;
             if (toolText.includes(selectedText)) {
-                const spanHtml = `<span id="${spanId}" class="rc-suggestion-highlight" data-suggestion="${suggestionText.replace(/"/g, '&quot;')}" data-selected-text="${selectedText.replace(/"/g, '&quot;')}">${selectedText}</span>`;
+                const spanHtml = `<span id="${spanId}" class="${cssClass}" data-suggestion="${suggestionText.replace(/"/g, '&quot;')}" data-selected-text="${selectedText.replace(/"/g, '&quot;')}" data-type="${type}">${selectedText}</span>`;
                 textContent.innerHTML = toolText.replace(selectedText, spanHtml);
                 // Re-add click handler to the newly created span
                 const newSpan = textContent.querySelector(`#${spanId}`);
@@ -1659,7 +1676,8 @@ async function saveSuggestion(tool, selection, suggestionText) {
                         e.stopPropagation();
                         const suggestion = this.getAttribute('data-suggestion');
                         const selectedText = this.getAttribute('data-selected-text');
-                        showSuggestionTooltip(this, suggestion, selectedText);
+                        const spanType = this.getAttribute('data-type') || 'suggestion';
+                        showSuggestionTooltip(this, suggestion, selectedText, spanType);
                     });
                 }
             }
@@ -1672,13 +1690,14 @@ async function saveSuggestion(tool, selection, suggestionText) {
     }
     
     const suggestion = {
-        id: `suggestion_${Date.now()}`,
+        id: `${type}_${Date.now()}`,
         toolId: toolId,
         expositionId: expositionId,
         weaveId: weaveId,
         spanId: spanId, // New field: unique identifier for the span
         selectedText: selection.text, // Keep for backward compatibility and debugging
         suggestion: suggestionText,
+        type: type, // New field: 'suggestion' or 'comment'
         timestamp: new Date().toISOString(),
         url: window.location.href,
         toolType: toolType
@@ -1770,7 +1789,8 @@ async function saveSuggestion(tool, selection, suggestionText) {
                 // Listen for the result
                 const handleSuccess = (event) => {
                     if (event.detail.toolId === toolId) {
-                        showNotification(`✅ Suggestion applied to tool ${toolId}!`);
+                        const capitalizedType = type.charAt(0).toUpperCase() + type.slice(1);
+                        showNotification(`${capitalizedType} applied to tool ${toolId}!`);
                         window.removeEventListener('rcToolUpdateSuccess', handleSuccess);
                         window.removeEventListener('rcToolUpdateError', handleError);
                         document.head.removeChild(executeScript);
@@ -1828,7 +1848,7 @@ async function saveSuggestion(tool, selection, suggestionText) {
     // Re-store tools to update suggestion counts in export data
     const allTextTools = document.querySelectorAll('.tool-text, .tool-simpletext');
     if (allTextTools.length > 0) {
-        console.log(`💾 Re-storing tool ${toolId} with spans in DOM:`, tool.querySelector('.html-text-editor-content')?.innerHTML?.includes('rc-suggestion-highlight'));
+        console.log(`💾 Re-storing tool ${toolId} with spans in DOM:`, tool.querySelector('.html-text-editor-content')?.innerHTML?.includes('rc-suggestion-highlight') || tool.querySelector('.html-text-editor-content')?.innerHTML?.includes('rc-comment-highlight'));
         await storeToolsInMemory(Array.from(allTextTools));
     }
 }
@@ -1853,22 +1873,23 @@ async function updateToolWithSuggestionCount(tool) {
 
 // Function to add click handlers to restored spans
 async function addClickHandlersToRestoredSpans(textContent, toolId) {
-    const spans = textContent.querySelectorAll('.rc-suggestion-highlight');
+    const spans = textContent.querySelectorAll('.rc-suggestion-highlight, .rc-comment-highlight');
     if (spans.length === 0) return;
     
     spans.forEach(span => {
         // Check if span has suggestion data stored in attributes
         const suggestion = span.getAttribute('data-suggestion');
         const selectedText = span.getAttribute('data-selected-text');
+        const type = span.getAttribute('data-type') || 'suggestion';
         
         if (suggestion) {
             // Data is already in the span - just add click handler
             span.addEventListener('click', function(e) {
                 e.preventDefault();
                 e.stopPropagation();
-                showSuggestionTooltip(this, suggestion, selectedText);
+                showSuggestionTooltip(this, suggestion, selectedText, type);
             });
-            console.log(`🔗 Added click handler to span ${span.id} (self-contained data)`);
+            console.log(`🔗 Added click handler to span ${span.id} (self-contained data, type: ${type})`);
         } else {
             // Fallback: try to get data from storage (for older spans)
             console.log(`⚠️ Span ${span.id} missing data attributes, attempting storage lookup...`);
@@ -1894,17 +1915,18 @@ async function addClickHandlerFromStorage(span, toolId) {
             span.addEventListener('click', function(e) {
                 e.preventDefault();
                 e.stopPropagation();
-                showSuggestionTooltip(this, suggestion.suggestion, suggestion.selectedText);
+                const suggestionType = suggestion.type || 'suggestion';
+                showSuggestionTooltip(this, suggestion.suggestion, suggestion.selectedText, suggestionType);
             });
-            console.log(`🔗 Added click handler to span ${span.id} (from storage)`);
+            console.log(`🔗 Added click handler to span ${span.id} (from storage, type: ${suggestion.type || 'suggestion'})`);
         }
     } catch (error) {
         console.error('❌ Error adding click handler from storage:', error);
     }
 }
 
-// Function to show suggestion tooltip
-function showSuggestionTooltip(spanElement, suggestionText, selectedText) {
+// Function to show suggestion or comment tooltip
+function showSuggestionTooltip(spanElement, suggestionText, selectedText, type = 'suggestion') {
     // Remove any existing tooltips
     const existingTooltips = document.querySelectorAll('.rc-suggestion-tooltip');
     existingTooltips.forEach(tooltip => tooltip.remove());
@@ -1913,8 +1935,12 @@ function showSuggestionTooltip(spanElement, suggestionText, selectedText) {
     const tooltip = document.createElement('div');
     tooltip.className = 'rc-suggestion-tooltip';
     
+    const header = type === 'comment' ? 'Comment' : 'Suggestion';
+    const bgColor = type === 'comment' ? '#4CAF50' : '#FFC107';
+    const textColor = type === 'comment' ? 'white' : '#333';
+    
     tooltip.innerHTML = `
-        <div class="rc-suggestion-tooltip-header">Suggestion</div>
+        <div class="rc-suggestion-tooltip-header" style="background: ${bgColor}; color: ${textColor};">${header}</div>
         <div class="rc-suggestion-tooltip-text"><strong>Selected:</strong> "${selectedText}"</div>
         <div class="rc-suggestion-tooltip-suggestion">${suggestionText}</div>
     `;
@@ -2080,13 +2106,14 @@ function setupGlobalSuggestionInterface() {
         </div>
         
         <div style="margin-bottom: 15px;">
-            <div style="font-size: 12px; font-weight: bold; margin-bottom: 5px; color: #555;">Your suggestion:</div>
-            <textarea class="rc-suggestion-input" placeholder="Enter your suggestion here..." style="width: 100%; height: 80px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; resize: vertical; font-size: 13px; font-family: inherit;"></textarea>
+            <div style="font-size: 12px; font-weight: bold; margin-bottom: 5px; color: #555;">Your comment or suggestion:</div>
+            <textarea class="rc-suggestion-input" placeholder="Enter your comment or suggestion here..." style="width: 100%; height: 80px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; resize: vertical; font-size: 13px; font-family: inherit;"></textarea>
         </div>
         
         <div style="display: flex; gap: 10px; justify-content: flex-end;">
             <button class="rc-cancel-suggestion" style="padding: 8px 16px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">Cancel</button>
-            <button class="rc-save-suggestion" style="padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">Save</button>
+            <button class="rc-save-comment" style="padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; margin-right: 8px;">Comment</button>
+            <button class="rc-save-suggestion" style="padding: 8px 16px; background: #FFC107; color: #333; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">Suggest</button>
         </div>
     `;
     
@@ -2096,7 +2123,8 @@ function setupGlobalSuggestionInterface() {
     const selectedTextDisplay = suggestionEditor.querySelector('.rc-selected-text');
     const suggestionInput = suggestionEditor.querySelector('.rc-suggestion-input');
     const closeBtn = suggestionEditor.querySelector('.rc-close-suggestion');
-    const saveBtn = suggestionEditor.querySelector('.rc-save-suggestion');
+    const saveCommentBtn = suggestionEditor.querySelector('.rc-save-comment');
+    const saveSuggestionBtn = suggestionEditor.querySelector('.rc-save-suggestion');
     const cancelBtn = suggestionEditor.querySelector('.rc-cancel-suggestion');
     
     let currentSelection = null;
@@ -2176,24 +2204,34 @@ function setupGlobalSuggestionInterface() {
         currentTool = null;
     });
     
-    // Save button handler
-    saveBtn.addEventListener('click', async () => {
+    // Save suggestion button handler
+    saveSuggestionBtn.addEventListener('click', async () => {
+        await handleGlobalSaveAction('suggestion');
+    });
+    
+    // Save comment button handler
+    saveCommentBtn.addEventListener('click', async () => {
+        await handleGlobalSaveAction('comment');
+    });
+    
+    // Helper function for global save action
+    async function handleGlobalSaveAction(type) {
         if (!currentSelection || !currentTool) {
-            showNotification('Please select text and enter a suggestion');
+            showNotification(`Please select text and enter a ${type}`);
             return;
         }
         
         const suggestionText = suggestionInput.value.trim();
         if (!suggestionText) {
-            showNotification('Please enter a suggestion');
+            showNotification(`Please enter a ${type}`);
             return;
         }
         
         try {
-            console.log('RC Tool Commenter: Saving suggestion for tool:', currentTool.dataset.id);
-            await saveSuggestion(currentTool, currentSelection, suggestionText);
+            console.log(`RC Tool Commenter: Saving ${type} for tool:`, currentTool.dataset.id);
+            await saveSuggestion(currentTool, currentSelection, suggestionText, type);
             
-            showNotification('Suggestion saved successfully');
+            showNotification(`${type.charAt(0).toUpperCase() + type.slice(1)} saved successfully`);
             
             // Hide the editor
             suggestionEditor.style.display = 'none';
@@ -2203,14 +2241,14 @@ function setupGlobalSuggestionInterface() {
             // Re-store tools with updated suggestion data
             const allTextTools = document.querySelectorAll('.tool-text, .tool-simpletext');
             if (allTextTools.length > 0) {
-                console.log('RC Tool Commenter: Re-storing tools with updated suggestion data');
+                console.log(`RC Tool Commenter: Re-storing tools with updated ${type} data`);
                 await storeToolsInMemory(Array.from(allTextTools));
             }
         } catch (error) {
-            console.error('RC Tool Commenter: Error saving suggestion:', error);
-            showNotification('Error saving suggestion');
+            console.error(`RC Tool Commenter: Error saving ${type}:`, error);
+            showNotification(`Error saving ${type}`);
         }
-    });
+    }
     
     // Escape key handler
     const escapeHandler = (e) => {
@@ -2261,6 +2299,21 @@ async function enhanceTools() {
     if (!suggestionBadgesRestored) {
         const allTextTools = document.querySelectorAll('.tool-text, .tool-simpletext');
         await restoreSuggestionBadges(Array.from(allTextTools));
+        
+        // ADDITIONAL: Ensure ALL existing spans have click handlers, regardless of restoration logic
+        console.log('🔗 Ensuring all existing spans have click handlers...');
+        allTextTools.forEach(tool => {
+            const toolId = tool.dataset.id;
+            const textContent = tool.querySelector('.html-text-editor-content');
+            if (textContent && toolId) {
+                const existingSpans = textContent.querySelectorAll('.rc-suggestion-highlight, .rc-comment-highlight');
+                if (existingSpans.length > 0) {
+                    console.log(`🔗 Found ${existingSpans.length} existing spans in tool ${toolId}, ensuring click handlers...`);
+                    addClickHandlersToRestoredSpans(textContent, toolId);
+                }
+            }
+        });
+        
         suggestionBadgesRestored = true; // Prevent repeated calls
     }
     
@@ -2382,7 +2435,7 @@ async function restoreToolHtmlSpan(tool, toolId, expositionData, weaveId) {
             return;
         }
         
-        const hasSpans = textContent.innerHTML.includes('rc-suggestion-highlight');
+        const hasSpans = textContent.innerHTML.includes('rc-suggestion-highlight') || textContent.innerHTML.includes('rc-comment-highlight');
         const htmlSpanDifferent = toolData.content.htmlSpan !== toolData.content.html;
         
         console.log(`🔧 Tool ${toolId}: hasSpans=${hasSpans}, htmlSpanDifferent=${htmlSpanDifferent}`);
