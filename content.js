@@ -2971,15 +2971,204 @@ function setupGlobalSuggestionInterface() {
     console.log('RC Tool Commenter: Global suggestion interface setup complete');
 }
 
+// Function to add "Convert to HTML tool" button for simpletext tools
+function addConvertToHtmlButton(tool) {
+    // Check if button already exists
+    if (tool.querySelector('.rc-convert-button')) {
+        return;
+    }
+    
+    const toolContent = tool.querySelector('.tool-content');
+    if (!toolContent) return;
+    
+    // Create convert button
+    const convertButton = document.createElement('button');
+    convertButton.className = 'rc-convert-button';
+    convertButton.textContent = 'Convert to HTML tool';
+    convertButton.title = 'Convert this simple text tool to HTML text tool to enable comments and suggestions';
+    
+    // Style the button
+    Object.assign(convertButton.style, {
+        position: 'absolute',
+        top: '5px',
+        right: '5px',
+        padding: '4px 8px',
+        fontSize: '11px',
+        backgroundColor: '#28a745',
+        color: 'white',
+        border: 'none',
+        borderRadius: '3px',
+        cursor: 'pointer',
+        zIndex: '1000',
+        transition: 'all 0.2s ease',
+        opacity: '0.8'
+    });
+    
+    // Hover effects
+    convertButton.addEventListener('mouseenter', () => {
+        convertButton.style.opacity = '1';
+        convertButton.style.backgroundColor = '#218838';
+    });
+    
+    convertButton.addEventListener('mouseleave', () => {
+        convertButton.style.opacity = '0.8';
+        convertButton.style.backgroundColor = '#28a745';
+    });
+    
+    // Click handler for conversion
+    convertButton.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const toolId = tool.dataset.id;
+        if (!toolId) {
+            showNotification('Unable to find tool ID for conversion', 'error');
+            return;
+        }
+        
+        await convertSimpletextToHtml(tool, toolId);
+    });
+    
+    // Add button to tool content
+    toolContent.style.position = 'relative';
+    toolContent.appendChild(convertButton);
+    
+    console.log(`🔲 Added convert button to simpletext tool ${tool.dataset.id}`);
+}
+
+// Function to convert simpletext tool to HTML text tool
+async function convertSimpletextToHtml(toolElement, toolId) {
+    try {
+        console.log(`🔄 Starting conversion of simpletext tool ${toolId} to HTML text tool`);
+        
+        // Disable the button during conversion
+        const convertButton = toolElement.querySelector('.rc-convert-button');
+        if (convertButton) {
+            convertButton.disabled = true;
+            convertButton.textContent = 'Converting...';
+            convertButton.style.opacity = '0.6';
+        }
+        
+        // Get current page context
+        const bodyElement = document.body;
+        const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
+        
+        // Construct the conversion API URL
+        const baseUrl = window.location.origin;
+        const conversionUrl = `${baseUrl}/item/convert?item=${toolId}&research=${expositionId}`;
+        
+        console.log(`📡 RC API: Conversion URL: ${conversionUrl}`);
+        
+        // Step 1: GET the conversion form (confirmation dialog)
+        console.log(`📡 RC API: Step 1 - Getting conversion confirmation form...`);
+        const getResponse = await fetch(conversionUrl, {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            credentials: 'same-origin'
+        });
+        
+        console.log(`📡 RC API: GET response status: ${getResponse.status}`);
+        
+        if (!getResponse.ok) {
+            throw new Error(`GET request failed with status ${getResponse.status}`);
+        }
+        
+        const formHtml = await getResponse.text();
+        console.log(`📡 RC API: Received confirmation form (${formHtml.length} chars)`);
+        
+        // Step 2: POST the conversion confirmation
+        console.log(`📡 RC API: Step 2 - Confirming conversion...`);
+        const postResponse = await fetch(conversionUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: 'confirmation=confirmation&yesbutton=yesbutton',
+            credentials: 'same-origin'
+        });
+        
+        console.log(`📡 RC API: POST response status: ${postResponse.status}`);
+        
+        if (!postResponse.ok) {
+            throw new Error(`POST request failed with status ${postResponse.status}`);
+        }
+        
+        const postResult = await postResponse.text();
+        console.log(`📡 RC API: Conversion confirmed (${postResult.length} chars)`);
+        
+        // Step 3: GET the updated tool
+        console.log(`📡 RC API: Step 3 - Fetching updated tool...`);
+        const listUrl = `${baseUrl}/item/list?item=${toolId}`;
+        const listResponse = await fetch(listUrl, {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            credentials: 'same-origin'
+        });
+        
+        console.log(`📡 RC API: Tool list response status: ${listResponse.status}`);
+        
+        if (listResponse.ok) {
+            const updatedHtml = await listResponse.text();
+            console.log(`📡 RC API: Updated tool HTML (${updatedHtml.length} chars)`);
+            
+            // Update the tool in the DOM
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = updatedHtml;
+            const updatedTool = tempDiv.querySelector('.tool');
+            
+            if (updatedTool) {
+                // Replace the old tool with the updated one
+                toolElement.outerHTML = updatedTool.outerHTML;
+                console.log(`✅ Successfully replaced tool ${toolId} in DOM with converted version`);
+                
+                // Re-enhance the new tool
+                setTimeout(() => {
+                    const newToolElement = document.querySelector(`[data-id="${toolId}"]`);
+                    if (newToolElement) {
+                        enhanceTools([newToolElement]);
+                        console.log(`🔧 Re-enhanced converted tool ${toolId}`);
+                    }
+                }, 100);
+                
+                showNotification('Tool converted successfully! You can now add comments and suggestions.', 'success');
+            } else {
+                throw new Error('Updated tool not found in response');
+            }
+        } else {
+            throw new Error(`Tool list request failed with status ${listResponse.status}`);
+        }
+        
+        console.log(`✅ Successfully converted simpletext tool ${toolId} to HTML text tool`);
+        
+    } catch (error) {
+        console.error(`❌ Conversion failed for tool ${toolId}:`, error);
+        
+        // Re-enable the button
+        const convertButton = toolElement.querySelector('.rc-convert-button');
+        if (convertButton) {
+            convertButton.disabled = false;
+            convertButton.textContent = 'Convert to HTML tool';
+            convertButton.style.opacity = '0.8';
+        }
+        
+        showNotification(`Failed to convert tool: ${error.message}`, 'error');
+    }
+}
+
 // Function to enhance text tools with permanent blue borders and global suggestion capability
-async function enhanceTools() {
+async function enhanceTools(toolsToEnhance = null) {
     // Skip tool enhancement if we're in text-only view
     if (isTextOnlyView) {
         console.log('RC Tool Commenter: Skipping tool enhancement - in text-only view');
         return;
     }
     
-    const tools = await identifyTools();
+    const tools = toolsToEnhance || await identifyTools();
     
     if (tools.length > 0) {
         console.log(`RC Tool Commenter: Enhancing ${tools.length} new tools`);
@@ -3034,7 +3223,7 @@ async function enhanceTools() {
         
         const toolType = tool.dataset.tool;
         
-        // For text tools, add permanent blue borders and enable text selection
+    // For text tools, add permanent blue borders and enable text selection
         if (toolType === 'text' || toolType === 'simpletext') {
             const toolContent = tool.querySelector('.tool-content');
             if (toolContent) {
@@ -3047,6 +3236,11 @@ async function enhanceTools() {
             const textEditorContent = tool.querySelector('.html-text-editor-content');
             if (textEditorContent) {
                 textEditorContent.style.userSelect = 'text';
+            }
+            
+            // For simpletext tools, add conversion button
+            if (toolType === 'simpletext') {
+                addConvertToHtmlButton(tool);
             }
         } else {
             // For non-text tools, keep the old click behavior for showing tool names
