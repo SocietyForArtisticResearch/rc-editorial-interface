@@ -3,6 +3,10 @@
 
 console.log('RC Tool Commenter: Content script loaded');
 
+// Detect editor mode vs viewing mode
+const isEditorMode = window.location.pathname.includes('/editor') || document.body.classList.contains('editor-block');
+console.log('RC Tool Commenter: Mode detected:', isEditorMode ? 'EDITOR' : 'VIEWER');
+
 // Check if user has edit permissions for the current exposition
 async function checkEditPermissions(expositionId) {
     // Use cached result if it's recent (within 5 minutes)
@@ -89,7 +93,8 @@ function showPermissionDeniedMessage() {
 function isExpositionPage() {
     return window.location.hostname.includes('researchcatalogue.net') && 
            (window.location.pathname.includes('/exposition/') || 
-            window.location.pathname.includes('/view/'));
+            window.location.pathname.includes('/view/') ||
+            window.location.pathname.includes('/editor'));
 }
 
 // Function to identify tool elements in the exposition
@@ -220,10 +225,23 @@ function getAllTextTools() {
 // Function to extract exposition and weave IDs from URL
 function extractFromUrl(type) {
     const url = window.location.href;
+    
+    // Handle editor URLs with query parameters: /editor?research=123&weave=456
+    if (window.location.pathname.includes('/editor')) {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (type === 'exposition') {
+            return urlParams.get('research');
+        } else if (type === 'weave') {
+            return urlParams.get('weave');
+        }
+    }
+    
+    // Handle view URLs with path parameters: /view/123/456
     const match = url.match(/\/view\/(\d+)\/(\d+)/);
     if (match) {
         return type === 'exposition' ? match[1] : match[2];
     }
+    
     return null;
 }
 
@@ -440,6 +458,12 @@ async function updateSaveButtonCount(expositionData) {
 
 // Function to create save button
 function createSaveButton() {
+    // Skip creating save button in editor mode
+    if (isEditorMode) {
+        console.log('🚫 Skipping save button in editor mode');
+        return;
+    }
+    
     // Remove existing button if present
     const existingButton = document.getElementById('rc-save-tools-btn');
     if (existingButton) {
@@ -1939,6 +1963,8 @@ async function addClickHandlersToRestoredSpans(textContent, toolId) {
     const spans = textContent.querySelectorAll('.rc-suggestion-highlight, .rc-comment-highlight');
     if (spans.length === 0) return;
     
+    console.log(`🔗 addClickHandlersToRestoredSpans: Mode=${isEditorMode ? 'EDITOR' : 'VIEWER'}, Tool=${toolId}, Spans=${spans.length}`);
+    
     spans.forEach(span => {
         // Check if span has suggestion data stored in attributes
         const suggestion = span.getAttribute('data-suggestion');
@@ -1948,12 +1974,27 @@ async function addClickHandlersToRestoredSpans(textContent, toolId) {
         if (suggestion) {
             // Data is already in the span - just add click handler
             span.addEventListener('click', function(e) {
+                console.log(`🔗 SPAN CLICKED in ${isEditorMode ? 'EDITOR' : 'VIEWER'} mode:`, {
+                    spanId: this.id,
+                    type: type,
+                    defaultPrevented: e.defaultPrevented,
+                    cancelBubble: e.cancelBubble,
+                    target: e.target,
+                    currentTarget: e.currentTarget
+                });
                 e.preventDefault();
                 e.stopPropagation();
                 showSuggestionTooltip(this, suggestion, selectedText, type);
             });
             console.log(`🔗 Added click handler to span ${span.id} (self-contained data, type: ${type})`);
-        } else {
+
+            // In editor mode, also try capturing the event at a higher level
+            if (isEditorMode) {
+                span.addEventListener('click', function(e) {
+                    console.log('🔗 EDITOR MODE: Secondary click handler triggered');
+                    showSuggestionTooltip(this, suggestion, selectedText, type);
+                }, true); // Use capture phase
+            }        } else {
             // Fallback: try to get data from storage (for older spans)
             console.log(`⚠️ Span ${span.id} missing data attributes, attempting storage lookup...`);
             addClickHandlerFromStorage(span, toolId);
@@ -1976,11 +2017,26 @@ async function addClickHandlerFromStorage(span, toolId) {
         const suggestion = toolSuggestions.find(s => s.spanId === span.id);
         if (suggestion) {
             span.addEventListener('click', function(e) {
+                console.log(`🔗 SPAN CLICKED (from storage) in ${isEditorMode ? 'EDITOR' : 'VIEWER'} mode:`, {
+                    spanId: this.id,
+                    type: suggestion.type || 'suggestion',
+                    defaultPrevented: e.defaultPrevented,
+                    cancelBubble: e.cancelBubble
+                });
                 e.preventDefault();
                 e.stopPropagation();
                 const suggestionType = suggestion.type || 'suggestion';
                 showSuggestionTooltip(this, suggestion.suggestion, suggestion.selectedText, suggestionType);
             });
+
+            // In editor mode, also try capturing the event at a higher level
+            if (isEditorMode) {
+                span.addEventListener('click', function(e) {
+                    console.log('🔗 EDITOR MODE: Secondary click handler (from storage) triggered');
+                    const suggestionType = suggestion.type || 'suggestion';
+                    showSuggestionTooltip(this, suggestion.suggestion, suggestion.selectedText, suggestionType);
+                }, true); // Use capture phase
+            }
             console.log(`🔗 Added click handler to span ${span.id} (from storage, type: ${suggestion.type || 'suggestion'})`);
         }
     } catch (error) {
@@ -1990,6 +2046,8 @@ async function addClickHandlerFromStorage(span, toolId) {
 
 // Function to show suggestion or comment tooltip
 function showSuggestionTooltip(spanElement, suggestionText, selectedText, type = 'suggestion') {
+    console.log(`🔗 showSuggestionTooltip called: Mode=${isEditorMode ? 'EDITOR' : 'VIEWER'}, Type=${type}`);
+    
     // Verify the type matches the span's actual data-type attribute, with fallback to CSS class
     let actualType = spanElement.getAttribute('data-type');
     
@@ -2973,6 +3031,12 @@ function setupGlobalSuggestionInterface() {
 
 // Function to add "Convert to HTML tool" button for simpletext tools
 function addConvertToHtmlButton(tool) {
+    // Skip adding convert buttons in editor mode
+    if (isEditorMode) {
+        console.log('🚫 Skipping convert button in editor mode');
+        return;
+    }
+    
     // Check if button already exists
     if (tool.querySelector('.rc-convert-button')) {
         return;
@@ -3196,6 +3260,7 @@ async function enhanceTools(toolsToEnhance = null) {
         
         // ADDITIONAL: Ensure ALL existing spans have click handlers, regardless of restoration logic
         console.log('🔗 Ensuring all existing spans have click handlers...');
+        console.log(`🔗 Editor mode: ${isEditorMode}, Total tools found: ${allTextTools.length}`);
         allTextTools.forEach(tool => {
             const toolId = tool.dataset.id;
             const textContent = tool.querySelector('.html-text-editor-content');
@@ -3203,6 +3268,7 @@ async function enhanceTools(toolsToEnhance = null) {
                 const existingSpans = textContent.querySelectorAll('.rc-suggestion-highlight, .rc-comment-highlight');
                 if (existingSpans.length > 0) {
                     console.log(`🔗 Found ${existingSpans.length} existing spans in tool ${toolId}, ensuring click handlers...`);
+                    console.log(`🔗 Editor mode span attachment for tool ${toolId}:`, isEditorMode ? 'EDITOR' : 'VIEWER');
                     addClickHandlersToRestoredSpans(textContent, toolId);
                 }
             }
@@ -3953,6 +4019,40 @@ async function initializeExtension() {
     
     // Initial enhancement
     enhanceTools();
+
+    // Set up event delegation for editor mode span clicks
+    if (isEditorMode) {
+        console.log('🔗 Setting up event delegation for editor mode span clicks...');
+        document.addEventListener('click', function(e) {
+            // Check if the clicked element is one of our spans
+            if (e.target.matches('.rc-suggestion-highlight, .rc-comment-highlight')) {
+                console.log('🔗 EVENT DELEGATION: Span clicked in editor mode:', e.target.id);
+                
+                const span = e.target;
+                const suggestion = span.getAttribute('data-suggestion');
+                const selectedText = span.getAttribute('data-selected-text');
+                const type = span.getAttribute('data-type') || 
+                    (span.classList.contains('rc-comment-highlight') ? 'comment' : 'suggestion');
+                
+                if (suggestion && selectedText) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('🔗 EVENT DELEGATION: Showing tooltip via delegation');
+                    showSuggestionTooltip(span, suggestion, selectedText, type);
+                } else {
+                    console.log('🔗 EVENT DELEGATION: Missing data attributes, trying storage lookup...');
+                    // Fallback to storage lookup
+                    const tool = span.closest('.tool-text, .tool-simpletext');
+                    if (tool) {
+                        const toolId = tool.dataset.id;
+                        addClickHandlerFromStorage(span, toolId);
+                        // Trigger the newly added handler
+                        setTimeout(() => span.click(), 10);
+                    }
+                }
+            }
+        }, true); // Use capture phase to intercept before editor handlers
+    }
     
     // Update button with existing counts if available
     if (result[storageKey]) {
