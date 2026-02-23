@@ -332,6 +332,11 @@ async function storeToolsInMemory(tools) {
     }
     lastStorageCall = now;
     
+    // For page refreshes, always fetch fresh data from DOM to capture collaborative changes
+    if (isPageRefresh) {
+        console.log('🔄 Page refresh detected - forcing fresh tool content extraction from DOM');
+    }
+    
     const bodyElement = document.body;
     const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
     const weaveId = bodyElement.dataset.weave || extractFromUrl('weave') || 'unknown';
@@ -371,15 +376,18 @@ async function storeToolsInMemory(tools) {
         const toolData = extractToolContent(tool);
         
         // Preserve existing htmlSpan data if it has spans and current DOM doesn't
+        // BUT: Skip preservation on page refresh to ensure fresh collaborative content is captured
         const toolId = toolData.id;
         const existingToolData = expositionData.weaves[weaveId]?.tools?.find(t => t.id === toolId);
         
-        if (existingToolData?.content?.htmlSpan && 
+        if (!isPageRefresh && existingToolData?.content?.htmlSpan && 
             existingToolData.content.htmlSpan !== existingToolData.content.html &&
             toolData.content.htmlSpan === toolData.content.html) {
             
             console.log(`🔒 Preserving existing span data for tool ${toolId} (${existingToolData.content.htmlSpan.length} chars)`);
             toolData.content.htmlSpan = existingToolData.content.htmlSpan;
+        } else if (isPageRefresh && existingToolData?.content?.htmlSpan) {
+            console.log(`🔄 Page refresh: Skipping span preservation for tool ${toolId} to capture fresh collaborative changes`);
         }
         
         // Add suggestions for this tool
@@ -932,6 +940,8 @@ let suggestionBadgesRestored = false; // Flag to prevent repeated badge restorat
 let lastStorageCall = 0; // Throttle storage operations
 let permissionCheckCache = null; // Cache permission check results
 let permissionCheckTime = 0; // Track when permissions were last checked
+let isPageRefresh = false; // Flag to track page refreshes for collaborative editing
+let pageLoadTime = Date.now(); // Track when page was loaded
 
 // Function to toggle between normal and text-only view
 function toggleTextOnlyView() {
@@ -4077,6 +4087,71 @@ window.checkRCFunctions = function() {
 
 console.log('RC Tool Commenter: Functions assigned to window object');
 
+// Function to detect page refresh and clear stale data
+async function detectPageRefreshAndClearCache() {
+    // Check if this appears to be a page refresh rather than initial navigation
+    // We use performance.navigation if available, or check session storage
+    isPageRefresh = (window.performance && window.performance.navigation && 
+                    window.performance.navigation.type === 1) || 
+                   sessionStorage.getItem('rc_extension_was_active') === 'true';
+    
+    if (isPageRefresh) {
+        console.log('🔄 RC Tool Commenter: Page refresh detected - clearing cached tool data to ensure fresh collaborative content');
+        
+        const bodyElement = document.body;
+        const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
+        const weaveId = bodyElement.dataset.weave || extractFromUrl('weave') || 'unknown';
+        
+        if (expositionId !== 'unknown' && weaveId !== 'unknown') {
+            // Clear cached permission check to force re-validation
+            permissionCheckCache = null;
+            permissionCheckTime = 0;
+            
+            // Get current stored tool data
+            const storageKey = `rc_exposition_${expositionId}`;
+            const result = await browser.storage.local.get(storageKey);
+            const expositionData = result[storageKey];
+            
+            if (expositionData && expositionData.weaves && expositionData.weaves[weaveId]) {
+                console.log('🗑️ Clearing stale tool data for weave', weaveId, 'to force fresh fetch');
+                // Mark this weave's data as stale by removing last fetched timestamp
+                const weaveData = expositionData.weaves[weaveId];
+                weaveData.needsRefresh = true;
+                weaveData.lastRefreshed = new Date().toISOString();
+                
+                // Save updated exposition data
+                await browser.storage.local.set({ [storageKey]: expositionData });
+            }
+        }
+    }
+    
+    // Mark that extension is now active for future refresh detection
+    sessionStorage.setItem('rc_extension_was_active', 'true');
+}
+
+// Function to force fresh tool data fetch from live source
+async function fetchFreshToolsFromLiveSource() {
+    console.log('🔄 RC Tool Commenter: Fetching fresh tool data from live source for collaborative editing');
+    
+    // Reset enhancement tracking flags to force fresh processing
+    toolsStoredForCurrentWeave = false;
+    suggestionBadgesRestored = false;
+    
+    // Clear any existing tool enhancements to start fresh
+    const existingEnhancedTools = document.querySelectorAll('[data-rc-tool-enhanced]');
+    existingEnhancedTools.forEach(tool => {
+        tool.removeAttribute('data-rc-tool-enhanced');
+        // Remove existing badges and borders
+        const existingBadge = tool.querySelector('.rc-suggestion-badge');
+        if (existingBadge) {
+            existingBadge.remove();
+        }
+        tool.classList.remove('rc-tool-enhanced');
+    });
+    
+    console.log('✨ Cleared', existingEnhancedTools.length, 'existing tool enhancements for fresh processing');
+}
+
 // Function to initialize the extension
 async function initializeExtension() {
     if (isInitialized) {
@@ -4090,6 +4165,14 @@ async function initializeExtension() {
     if (!isExpositionPage()) {
         console.log('RC Tool Commenter: Not on a Research Catalogue exposition page');
         return;
+    }
+    
+    // Detect page refresh and handle stale data for collaborative editing
+    await detectPageRefreshAndClearCache();
+    
+    if (isPageRefresh) {
+        // For page refreshes, ensure we fetch fresh tool data
+        await fetchFreshToolsFromLiveSource();
     }
     
     // FIRST: Check permissions before doing ANYTHING else
