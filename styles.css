@@ -87,7 +87,7 @@
 /* View Toggle Button */
 .rc-view-toggle-button {
     position: fixed;
-    top: 120px;
+    top: 20px;
     right: 20px;
     z-index: 9999;
     background: linear-gradient(135deg, #28a745, #20c997);
