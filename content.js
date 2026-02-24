@@ -3500,7 +3500,8 @@ async function restoreSuggestionBadges(tools) {
     // Get suggestions for this exposition and weave
     const storageKey = `rc_suggestions_${expositionId}_${weaveId}`;
     const result = await browser.storage.local.get(storageKey);
-    const suggestions = result[storageKey] || {};
+    let suggestions = result[storageKey] || {};
+    let suggestionsChanged = false;
     
     // Get stored tool data for this exposition to access htmlSpan content
     const expositionStorageKey = `rc_exposition_${expositionId}`;
@@ -3508,6 +3509,55 @@ async function restoreSuggestionBadges(tools) {
     const expositionData = expositionResult[expositionStorageKey];
     
     console.log('RC Tool Commenter: Restoring badges and highlights for suggestions:', Object.keys(suggestions));
+    
+    // For page refreshes, validate suggestions against fresh content to handle collaborative changes
+    if (isPageRefresh) {
+        console.log('🔄 Page refresh detected - validating stored suggestions against fresh content');
+        
+        for (const tool of tools) {
+            const toolId = tool.dataset.id;
+            if (!toolId || !suggestions[toolId]) continue;
+            
+            // Get current tool text content
+            const textContent = tool.querySelector('.html-text-editor-content');
+            if (!textContent) continue;
+            
+            const currentContent = textContent.textContent || textContent.innerText || '';
+            const toolSuggestions = suggestions[toolId];
+            const validSuggestions = [];
+            
+            console.log(`🔍 Validating ${toolSuggestions.length} suggestions for tool ${toolId}`);
+            
+            // Check each suggestion against current content
+            for (const suggestion of toolSuggestions) {
+                const selectedText = suggestion.selectedText;
+                if (selectedText && currentContent.includes(selectedText)) {
+                    // Suggestion text still exists in current content - keep it
+                    validSuggestions.push(suggestion);
+                } else {
+                    // Suggestion text no longer exists - likely accepted by collaborator
+                    console.log(`🗑️ Removing invalid suggestion: "${selectedText}" not found in current content`);
+                    suggestionsChanged = true;
+                }
+            }
+            
+            // Update suggestions for this tool
+            if (validSuggestions.length !== toolSuggestions.length) {
+                if (validSuggestions.length > 0) {
+                    suggestions[toolId] = validSuggestions;
+                } else {
+                    delete suggestions[toolId];
+                }
+                console.log(`✅ Tool ${toolId}: ${toolSuggestions.length} → ${validSuggestions.length} valid suggestions`);
+            }
+        }
+        
+        // Save updated suggestions if any were removed
+        if (suggestionsChanged) {
+            await browser.storage.local.set({ [storageKey]: suggestions });
+            console.log('💾 Updated storage with validated suggestions after page refresh');
+        }
+    }
     
     // Add badges to tools that have suggestions and restore visual highlights
     for (const tool of tools) {
