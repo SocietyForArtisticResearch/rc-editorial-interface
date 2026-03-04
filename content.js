@@ -4165,6 +4165,17 @@ async function initializeExtension() {
         return;
     }
     
+    // Check if extension is disabled
+    try {
+        const extensionState = await browser.storage.local.get('extensionDisabled');
+        if (extensionState.extensionDisabled === true) {
+            console.log('RC Tool Commenter: Extension is disabled, skipping initialization');
+            return;
+        }
+    } catch (error) {
+        console.log('RC Tool Commenter: Could not check extension state, proceeding with initialization');
+    }
+    
     console.log('RC Tool Commenter: *** initializeExtension() called ***');
     isInitialized = true;
     

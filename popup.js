@@ -3,6 +3,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusDiv = document.getElementById('status');
     const statusText = document.getElementById('status-text');
     const openRCButton = document.getElementById('openRC');
+    const toggleButton = document.getElementById('toggleExtension');
+    
+    // Check extension enabled state
+    checkExtensionState();
     
     // Check if we're currently on a Research Catalogue page
     browser.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -30,9 +34,47 @@ document.addEventListener('DOMContentLoaded', () => {
         window.close();
     });
     
+    // Handle disable/enable button
+    toggleButton.addEventListener('click', async () => {
+        const currentState = await browser.storage.local.get('extensionDisabled');
+        const isDisabled = currentState.extensionDisabled || false;
+        
+        // Toggle the state
+        await browser.storage.local.set({ 'extensionDisabled': !isDisabled });
+        
+        // Update UI
+        updateToggleButton(!isDisabled);
+        
+        // Reload current tab if it's an RC page to apply changes immediately
+        browser.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            const currentTab = tabs[0];
+            if (currentTab.url && currentTab.url.includes('researchcatalogue.net')) {
+                browser.tabs.reload(currentTab.id);
+            }
+        });
+    });
+    
     // Show recent tool interactions (for future enhancement)
     displayRecentInteractions();
 });
+
+async function checkExtensionState() {
+    const result = await browser.storage.local.get('extensionDisabled');
+    const isDisabled = result.extensionDisabled || false;
+    updateToggleButton(isDisabled);
+}
+
+function updateToggleButton(isDisabled) {
+    const toggleButton = document.getElementById('toggleExtension');
+    
+    if (isDisabled) {
+        toggleButton.textContent = 'Enable Extension';
+        toggleButton.className = 'button button-enable';
+    } else {
+        toggleButton.textContent = 'Disable Extension';
+        toggleButton.className = 'button button-disable';
+    }
+}
 
 function displayRecentInteractions() {
     browser.storage.local.get(null, (items) => {
