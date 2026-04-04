@@ -1750,7 +1750,24 @@ function setupSuggestionEventHandlers(overlay, tool) {
             
         } catch (error) {
             console.error(`RC Tool Commenter: Error saving ${type}:`, error);
-            showNotification(`Error saving ${type}`);
+            console.error('Error object:', error);
+            console.error('Error toString():', error?.toString());
+            console.error('Error message property:', error?.message);
+            
+            // Extract error message with multiple fallbacks
+            let errorMsg = 'Error saving ' + type;
+            if (error) {
+                if (typeof error === 'string') {
+                    errorMsg = error;
+                } else if (error.message && typeof error.message === 'string' && error.message.length > 0) {
+                    errorMsg = error.message;
+                } else if (error.toString && error.toString() !== '[object Object]') {
+                    errorMsg = error.toString();
+                }
+            }
+            
+            console.log('Final error message to display:', errorMsg);
+            showNotification(errorMsg);
         }
     }
     
@@ -1878,7 +1895,11 @@ async function saveSuggestion(tool, selection, suggestionText, type = 'suggestio
         console.log('RC Tool Commenter: Wrapped selection in span with ID:', spanId);
     } catch (error) {
         console.warn('RC Tool Commenter: Could not wrap selection in span:', error);
-        throw new Error('Failed to create suggestion highlight');
+        // Check if error is due to nested or complex selection
+        if (error.message && (error.message.includes('not usable') || error.message.includes('not a valid'))) {
+            throw new Error('Nested suggestions are not allowed. Please refine your selection');
+        }
+        throw new Error('Nested suggestions are not allowed. Please refine your selection');
     }
     
     const suggestion = {
@@ -3200,7 +3221,24 @@ function setupGlobalSuggestionInterface() {
             }
         } catch (error) {
             console.error(`RC Tool Commenter: Error saving ${type}:`, error);
-            showNotification(`Error saving ${type}`);
+            console.error('Error object:', error);
+            console.error('Error toString():', error?.toString());
+            console.error('Error message property:', error?.message);
+            
+            // Extract error message with multiple fallbacks
+            let errorMsg = 'Error saving ' + type;
+            if (error) {
+                if (typeof error === 'string') {
+                    errorMsg = error;
+                } else if (error.message && typeof error.message === 'string' && error.message.length > 0) {
+                    errorMsg = error.message;
+                } else if (error.toString && error.toString() !== '[object Object]') {
+                    errorMsg = error.toString();
+                }
+            }
+            
+            console.log('Final error message to display:', errorMsg);
+            showNotification(errorMsg);
         }
     }
     
