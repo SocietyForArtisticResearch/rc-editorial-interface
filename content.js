@@ -826,9 +826,6 @@ async function handleImportFile(event) {
             const existingTools = document.querySelectorAll('[data-rc-tool-enhanced]');
             existingTools.forEach(tool => {
                 tool.removeAttribute('data-rc-tool-enhanced');
-                // Remove existing badges and styling
-                const badge = tool.querySelector('.rc-suggestion-count');
-                if (badge) badge.remove();
                 tool.style.cursor = '';
                 tool.style.outline = '';
                 tool.style.outlineOffset = '';
@@ -993,7 +990,6 @@ let isTextOnlyView = false;
 let lastToolIdentification = 0;
 let isInitialized = false; // Prevent duplicate initialization
 let toolsStoredForCurrentWeave = false; // Flag to prevent repeated storage calls
-let suggestionBadgesRestored = false; // Flag to prevent repeated badge restoration
 let lastStorageCall = 0; // Throttle storage operations
 let permissionCheckCache = null; // Cache permission check results
 let permissionCheckTime = 0; // Track when permissions were last checked
@@ -2049,14 +2045,13 @@ async function saveSuggestion(tool, selection, suggestionText, type = 'suggestio
     }
 }
 
-// Function to update tool with suggestion count
+// Function to update tool with suggestion count (removed badge rendering)
 async function updateToolWithSuggestionCount(tool) {
     const toolId = tool.dataset.id || 'unknown';
     
     // Count actual suggestion and comment spans in the DOM (live data)
     const textContent = tool.querySelector('.html-text-editor-content');
     if (!textContent) {
-        addSuggestionBadge(tool, 0);
         return;
     }
     
@@ -2065,9 +2060,6 @@ async function updateToolWithSuggestionCount(tool) {
     const totalSpans = suggestionSpans.length + commentSpans.length;
     
     console.log(`🔍 Tool ${toolId}: Found ${suggestionSpans.length} suggestions + ${commentSpans.length} comments = ${totalSpans} total spans in DOM`);
-    
-    // Use the centralized badge function
-    addSuggestionBadge(tool, totalSpans);
 }
 
 // Function to add click handlers to restored spans
@@ -2428,9 +2420,6 @@ async function resolveComment(spanElement) {
         // Update the tool via RC API (pass spanInfo for proper removal)
         await updateToolAfterCommentResolution(tool, toolId, spanInfo);
         
-        // Update the suggestion badge count
-        await updateToolWithSuggestionCount(tool);
-        
         // Update save button count to reflect the resolved comment
         await updateSaveButtonCountAfterAction(expositionId);
         
@@ -2656,9 +2645,6 @@ async function acceptSuggestion(spanElement) {
         
         // Update the tool via RC API (pass spanInfo for proper text replacement)
         await updateToolAfterSuggestionAcceptance(tool, toolId, spanInfo);
-        
-        // Update the suggestion badge count
-        await updateToolWithSuggestionCount(tool);
         
         // Update save button count to reflect the accepted suggestion
         await updateSaveButtonCountAfterAction(expositionId);
@@ -3457,30 +3443,22 @@ async function enhanceTools(toolsToEnhance = null) {
         }
     }
     
-    // Restore suggestion badges for tools that have suggestions
-    // Always check all text tools, not just newly enhanced ones
-    if (!suggestionBadgesRestored) {
-        const allTextTools = document.querySelectorAll('.tool-text, .tool-simpletext');
-        await restoreSuggestionBadges(Array.from(allTextTools));
-        
-        // ADDITIONAL: Ensure ALL existing spans have click handlers, regardless of restoration logic
-        console.log('🔗 Ensuring all existing spans have click handlers...');
-        console.log(`🔗 Editor mode: ${isEditorMode}, Total tools found: ${allTextTools.length}`);
-        allTextTools.forEach(tool => {
-            const toolId = tool.dataset.id;
-            const textContent = tool.querySelector('.html-text-editor-content');
-            if (textContent && toolId) {
-                const existingSpans = textContent.querySelectorAll('.rc-suggestion-highlight, .rc-comment-highlight');
-                if (existingSpans.length > 0) {
-                    console.log(`🔗 Found ${existingSpans.length} existing spans in tool ${toolId}, ensuring click handlers...`);
-                    console.log(`🔗 Editor mode span attachment for tool ${toolId}:`, isEditorMode ? 'EDITOR' : 'VIEWER');
-                    addClickHandlersToRestoredSpans(textContent, toolId);
-                }
+    // Ensure all existing spans have click handlers
+    const allTextTools = document.querySelectorAll('.tool-text, .tool-simpletext');
+    console.log('🔗 Ensuring all existing spans have click handlers...');
+    console.log(`🔗 Editor mode: ${isEditorMode}, Total tools found: ${allTextTools.length}`);
+    allTextTools.forEach(tool => {
+        const toolId = tool.dataset.id;
+        const textContent = tool.querySelector('.html-text-editor-content');
+        if (textContent && toolId) {
+            const existingSpans = textContent.querySelectorAll('.rc-suggestion-highlight, .rc-comment-highlight');
+            if (existingSpans.length > 0) {
+                console.log(`🔗 Found ${existingSpans.length} existing spans in tool ${toolId}, ensuring click handlers...`);
+                console.log(`🔗 Editor mode span attachment for tool ${toolId}:`, isEditorMode ? 'EDITOR' : 'VIEWER');
+                addClickHandlersToRestoredSpans(textContent, toolId);
             }
-        });
-        
-        suggestionBadgesRestored = true; // Prevent repeated calls
-    }
+        }
+    });
     
     // Set up global suggestion interface (only once)
     if (!window.rcGlobalSuggestionSetup) {
@@ -3545,42 +3523,6 @@ async function enhanceTools(toolsToEnhance = null) {
     });
 }
 
-// Function to restore suggestion badges when navigating between weaves
-async function restoreSuggestionBadges(tools) {
-    const bodyElement = document.body;
-    const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
-    const weaveId = extractFromUrl('weave') || bodyElement.dataset.weave || 'unknown';
-    
-    // Get stored tool data for this exposition to access htmlSpan content
-    const expositionStorageKey = `rc_exposition_${expositionId}`;
-    const expositionResult = await browser.storage.local.get(expositionStorageKey);
-    const expositionData = expositionResult[expositionStorageKey];
-    
-    console.log('RC Tool Commenter: Restoring badges based on live DOM spans');
-    
-    // Add badges to tools based on actual DOM spans (live data)
-    for (const tool of tools) {
-        const toolId = tool.dataset.id;
-        
-        if (toolId) {
-            // Count suggestion and comment spans currently in the DOM
-            const textContent = tool.querySelector('.html-text-editor-content');
-            if (textContent) {
-                const suggestionSpans = textContent.querySelectorAll('.rc-suggestion-highlight');
-                const commentSpans = textContent.querySelectorAll('.rc-comment-highlight');
-                const totalSpans = suggestionSpans.length + commentSpans.length;
-                
-                if (totalSpans > 0) {
-                    console.log(`🔍 Tool ${toolId} has ${totalSpans} live spans - adding badge`);
-                    addSuggestionBadge(tool, totalSpans);
-                    
-                    // Restore htmlSpan content for this tool (for persistence)
-                    await restoreToolHtmlSpan(tool, toolId, expositionData, weaveId);
-                }
-            }
-        }
-    }
-}
 
 // Function to restore htmlSpan content for a tool
 async function restoreToolHtmlSpan(tool, toolId, expositionData, weaveId) {
@@ -3661,64 +3603,6 @@ async function restoreToolHtmlSpan(tool, toolId, expositionData, weaveId) {
     }
 }
 
-// Function to add suggestion badge to a tool
-function addSuggestionBadge(tool, count) {
-    // Safety check: ensure tool is still in the DOM
-    if (!tool || !tool.parentNode) {
-        console.log('Tool is detached from DOM, skipping badge addition');
-        return;
-    }
-    
-    // Remove existing badge
-    const existing = tool.querySelector('.rc-suggestion-count');
-    if (existing) {
-        existing.remove();
-    }
-    
-    if (count > 0) {
-        const badge = document.createElement('div');
-        badge.className = 'rc-suggestion-count';
-        badge.textContent = count;
-        badge.title = `${count} active suggestion${count > 1 ? 's' : ''} in this tool (live count)`;
-        badge.style.cssText = `
-            position: absolute;
-            top: -8px;
-            right: -8px;
-            background: #dc3545;
-            color: white;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            font-size: 11px;
-            font-weight: bold;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            cursor: pointer;
-            transition: transform 0.2s ease-in-out;
-        `;
-        
-        // Add hover effect
-        badge.addEventListener('mouseenter', () => {
-            badge.style.transform = 'scale(1.1)';
-        });
-        
-        badge.addEventListener('mouseleave', () => {
-            badge.style.transform = 'scale(1)';
-        });
-        
-        // Add click handler to show suggestions
-        badge.addEventListener('click', async (event) => {
-            event.stopPropagation();
-            event.preventDefault();
-            await showToolSuggestions(tool);
-        });
-        
-        tool.appendChild(badge);
-    }
-}
 
 // Function to show existing suggestions for a tool
 async function showToolSuggestions(tool) {
@@ -3917,9 +3801,6 @@ async function deleteSuggestion(suggestionId, tool) {
     
     // Save updated suggestions
     await browser.storage.local.set({ [storageKey]: suggestions });
-    
-    // Update tool badge
-    await updateToolWithSuggestionCount(tool);
     
     // Update save button
     const expositionStorageKey = `rc_exposition_${expositionId}`;
@@ -4192,22 +4073,15 @@ async function fetchFreshToolsFromLiveSource() {
     
     // Reset enhancement tracking flags to force fresh processing
     toolsStoredForCurrentWeave = false;
-    suggestionBadgesRestored = false;
     
     // Clear any existing tool enhancements to start fresh
     const existingEnhancedTools = document.querySelectorAll('[data-rc-tool-enhanced]');
     existingEnhancedTools.forEach(tool => {
         tool.removeAttribute('data-rc-tool-enhanced');
-        // Remove existing badges and borders
-        const existingBadge = tool.querySelector('.rc-suggestion-badge, .rc-suggestion-count');
-        if (existingBadge) {
-            existingBadge.remove();
-        }
         tool.classList.remove('rc-tool-enhanced');
     });
     
     console.log('✨ Cleared', existingEnhancedTools.length, 'existing tool enhancements for fresh processing');
-    console.log('✅ Badges will now be based on live DOM spans, not storage');
 }
 
 async function initializeExtension() {
@@ -4296,7 +4170,6 @@ async function initializeExtension() {
     
     // Reset storage flag for new weave
     toolsStoredForCurrentWeave = false;
-    suggestionBadgesRestored = false; // Reset badge restoration flag for new weave
     
     // Debug: Check all available tools on the page (commented out to reduce console spam)
     // const allTools = document.querySelectorAll('[class*="tool-"]');

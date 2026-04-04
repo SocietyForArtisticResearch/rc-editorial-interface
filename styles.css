@@ -118,6 +118,39 @@
     box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
 }
 
+/* Disable Extension Button */
+.rc-disable-extension-button {
+    position: fixed;
+    top: 75px;
+    right: 20px;
+    z-index: 9999;
+    background: linear-gradient(135deg, #dc3545, #c82333);
+    color: white;
+    border: none;
+    padding: 12px 16px;
+    border-radius: 25px;
+    cursor: pointer;
+    font-family: 'Lato', Arial, sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+}
+
+.rc-disable-extension-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(220, 53, 69, 0.4);
+}
+
+.rc-disable-extension-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
+}
+
 /* Text-Only View Styles */
 .rc-text-only-container {
     font-family: 'Lato', Arial, sans-serif;
@@ -205,30 +238,6 @@
     font-size: 12px;
     font-weight: 500;
     margin-left: auto;
-}
-
-.rc-text-view-badge {
-    position: absolute !important;
-    top: 8px !important;
-    right: 8px !important;
-    background: #dc3545 !important;
-    color: white !important;
-    border-radius: 50% !important;
-    width: 24px !important;
-    height: 24px !important;
-    font-size: 12px !important;
-    font-weight: bold !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    z-index: 10 !important;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.3) !important;
-    cursor: pointer !important;
-}
-
-.rc-text-view-badge:hover {
-    background: #c82333 !important;
-    transform: scale(1.1) !important;
 }
 
 .rc-text-only-item-content {
@@ -625,23 +634,6 @@
     padding: 1px 2px !important;
 }
 
-.rc-suggestion-count {
-    position: absolute !important;
-    top: -8px !important;
-    right: -8px !important;
-    background: #dc3545 !important;
-    color: white !important;
-    border-radius: 50% !important;
-    width: 20px !important;
-    height: 20px !important;
-    font-size: 11px !important;
-    font-weight: bold !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    z-index: 10 !important;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.3) !important;
-}
 
 /* Suggestion Viewer Styles */
 .rc-suggestion-viewer {
