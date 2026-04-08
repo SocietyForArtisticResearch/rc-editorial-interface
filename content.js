@@ -1200,32 +1200,12 @@ async function saveSuggestion(tool, selection, suggestionText, type = 'suggestio
         showNotification(`❌ Error applying suggestion: ${error.message}`);
     }
     
-    // Update tool's stored data to include suggestion count
-    await updateToolWithSuggestionCount(tool);
-    
     // Re-store tools to update suggestion counts in export data
     const allTextTools = document.querySelectorAll('.tool-text, .tool-simpletext');
     if (allTextTools.length > 0) {
         console.log(`💾 Re-storing tool ${toolId} with spans in DOM:`, tool.querySelector('.html-text-editor-content')?.innerHTML?.includes('rc-suggestion-highlight') || tool.querySelector('.html-text-editor-content')?.innerHTML?.includes('rc-comment-highlight'));
         await storeToolsInMemory(Array.from(allTextTools));
     }
-}
-
-// Function to update tool with suggestion count (removed badge rendering)
-async function updateToolWithSuggestionCount(tool) {
-    const toolId = tool.dataset.id || 'unknown';
-    
-    // Count actual suggestion and comment spans in the DOM (live data)
-    const textContent = tool.querySelector('.html-text-editor-content');
-    if (!textContent) {
-        return;
-    }
-    
-    const suggestionSpans = textContent.querySelectorAll('.rc-suggestion-highlight');
-    const commentSpans = textContent.querySelectorAll('.rc-comment-highlight');
-    const totalSpans = suggestionSpans.length + commentSpans.length;
-    
-    console.log(`🔍 Tool ${toolId}: Found ${suggestionSpans.length} suggestions + ${commentSpans.length} comments = ${totalSpans} total spans in DOM`);
 }
 
 // Function to add click handlers to restored spans
@@ -1591,30 +1571,6 @@ async function resolveComment(spanElement) {
     } catch (error) {
         console.error('❌ Error in resolveComment:', error);
         throw error;
-    }
-}
-
-// Function to retrieve resolved comments for a tool or entire weave
-async function getResolvedComments(toolId = null) {
-    try {
-        const bodyElement = document.body;
-        const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
-        const weaveId = bodyElement.dataset.weave || extractFromUrl('weave') || 'unknown';
-        const resolvedStorageKey = `rc_resolved_comments_${expositionId}_${weaveId}`;
-        
-        const result = await browser.storage.local.get(resolvedStorageKey);
-        const resolvedComments = result[resolvedStorageKey] || {};
-        
-        if (toolId) {
-            // Return resolved comments for specific tool
-            return resolvedComments[toolId] || [];
-        } else {
-            // Return all resolved comments for the weave
-            return resolvedComments;
-        }
-    } catch (error) {
-        console.error('Error retrieving resolved comments:', error);
-        return toolId ? [] : {};
     }
 }
 
@@ -2656,141 +2612,6 @@ async function enhanceTools(toolsToEnhance = null) {
             tool.addEventListener('mouseleave', () => {
                 tool.style.outline = '1px dashed rgba(0, 123, 255, 0.4)';
             });
-        }
-    });
-}
-
-
-// Function to restore htmlSpan content for a tool
-async function restoreToolHtmlSpan(tool, toolId, expositionData, weaveId) {
-    try {
-        console.log(`🔧 Restoring spans for tool ${toolId}`);
-        
-        // Find the text content area
-        const textContent = tool.querySelector('.html-text-editor-content');
-        if (!textContent) {
-            console.log(`❌ No text content area found for tool ${toolId}`);
-            return;
-        }
-        
-        // Check if we have stored tool data with htmlSpan
-        if (!expositionData || !expositionData.weaves || !expositionData.weaves[weaveId]) {
-            console.log(`❌ No stored data for weave ${weaveId}`);
-            return;
-        }
-        
-        const weaveData = expositionData.weaves[weaveId];
-        const toolData = weaveData.tools.find(t => t.id === toolId);
-        
-        if (!toolData || !toolData.content) {
-            console.log(`❌ No tool data found for tool ${toolId}`);
-            return;
-        }
-        
-        const hasSpans = textContent.innerHTML.includes('rc-suggestion-highlight') || textContent.innerHTML.includes('rc-comment-highlight');
-        const htmlSpanDifferent = toolData.content.htmlSpan !== toolData.content.html;
-        
-        console.log(`🔧 Tool ${toolId}: hasSpans=${hasSpans}, htmlSpanDifferent=${htmlSpanDifferent}`);
-        console.log(`📊 Tool ${toolId} data: html=${toolData.content.html?.length}chars, htmlSpan=${toolData.content.htmlSpan?.length}chars`);
-        
-        // Case 1: DOM has spans but stored data might be outdated - sync storage with DOM
-        if (hasSpans) {
-            const currentDOMContent = textContent.innerHTML;
-            if (toolData.content.htmlSpan !== currentDOMContent) {
-                console.log(`🔄 Tool ${toolId}: Syncing stored data with DOM (spans detected in DOM)`);
-                console.log(`📝 Updating htmlSpan: ${toolData.content.htmlSpan?.length || 0} → ${currentDOMContent.length} chars`);
-                
-                // Update stored data to match current DOM
-                toolData.content.htmlSpan = currentDOMContent;
-                
-                // Re-store the updated data
-                const bodyElement = document.body;
-                const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
-                const weaveId = bodyElement.dataset.weave || extractFromUrl('weave') || 'unknown';
-                const storageKey = `rc_exposition_${expositionId}`;
-                
-                const result = await browser.storage.local.get(storageKey);
-                if (result[storageKey] && result[storageKey].weaves && result[storageKey].weaves[weaveId]) {
-                    const weaveData = result[storageKey].weaves[weaveId];
-                    const storedTool = weaveData.tools.find(t => t.id === toolId);
-                    if (storedTool) {
-                        storedTool.content.htmlSpan = currentDOMContent;
-                        await browser.storage.local.set({ [storageKey]: result[storageKey] });
-                        console.log(`✅ Tool ${toolId}: Storage synchronized with DOM content`);
-                    }
-                }
-            }
-            
-            // Add click handlers to existing spans
-            addClickHandlersToRestoredSpans(textContent, toolId);
-        }
-        // Case 2: DOM doesn't have spans but storage does - restore from storage
-        else if (!hasSpans && htmlSpanDifferent && toolData.content.htmlSpan) {
-            textContent.innerHTML = toolData.content.htmlSpan;
-            console.log(`✅ Restored spans for tool ${toolId} from storage`);
-            
-            // Add click handlers to restored spans
-            addClickHandlersToRestoredSpans(textContent, toolId);
-        } else {
-            console.log(`⚠️ Tool ${toolId}: No restoration needed (hasSpans=${hasSpans}, different=${htmlSpanDifferent})`);
-        }
-        
-    } catch (error) {
-        console.error('❌ Error restoring spans:', error);
-    }
-}
-
-// Function to format date for display
-function formatDate(timestamp) {
-    const date = new Date(timestamp);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-}
-
-// Function to set up suggestion viewer event handlers
-function setupSuggestionViewerHandlers(viewer, tool) {
-    const closeBtn = viewer.querySelector('.rc-close-viewer');
-    const deleteButtons = viewer.querySelectorAll('.rc-delete-suggestion');
-    const highlightButtons = viewer.querySelectorAll('.rc-highlight-span');
-    
-    // Close button
-    closeBtn.addEventListener('click', () => {
-        viewer.remove();
-    });
-    
-    // Highlight span buttons
-    highlightButtons.forEach(button => {
-        button.addEventListener('click', () => {
-            const spanId = button.dataset.spanId;
-            highlightSuggestionSpan(spanId);
-        });
-    });
-    
-    // Delete suggestion buttons
-    deleteButtons.forEach(button => {
-        button.addEventListener('click', async () => {
-            const suggestionId = button.dataset.suggestionId;
-            const confirmed = confirm('Are you sure you want to delete this suggestion?');
-            
-            if (confirmed) {
-                await deleteSuggestion(suggestionId, tool);
-                viewer.remove();
-                showNotification('Suggestion deleted');
-            }
-        });
-    });
-    
-    // Close on escape key
-    document.addEventListener('keydown', function escapeHandler(e) {
-        if (e.key === 'Escape') {
-            viewer.remove();
-            document.removeEventListener('keydown', escapeHandler);
-        }
-    });
-    
-    // Close when clicking outside
-    viewer.addEventListener('click', (e) => {
-        if (e.target === viewer) {
-            viewer.remove();
         }
     });
 }
