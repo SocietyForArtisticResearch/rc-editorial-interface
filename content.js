@@ -171,56 +171,9 @@ async function identifyTools() {
         });
     }
     
-    if (tools.length > 0) {
-        console.log(`RC Tool Commenter: Total tools to enhance: ${tools.length}`);
-        createSaveButton();
-    } else {
-        console.log('RC Tool Commenter: No new tools to enhance');
-    }
-    
     return tools;
 }
 
-// Function to get all text tools regardless of enhancement state (for text-only view)
-function getAllTextTools() {
-    const toolSelectors = [
-        '.tool-text',
-        '.tool-simpletext'
-    ];
-    
-    let tools = [];
-    
-    console.log('RC Tool Commenter: Getting all text tools for text-only view...');
-    
-    toolSelectors.forEach(selector => {
-        const elements = document.querySelectorAll(selector);
-        console.log(`Found ${elements.length} elements with selector "${selector}"`);
-        
-        elements.forEach(element => {
-            // Include all tools, even if enhanced, but exclude tool-content divs
-            if (!element.classList.contains('tool-content') && !tools.includes(element)) {
-                console.log(`Adding tool for text-only view:`, element, `Class: ${element.className}, Data-tool: ${element.dataset.tool}`);
-                tools.push(element);
-            } else {
-                console.log(`Skipping tool-content or duplicate:`, element);
-            }
-        });
-    });
-    
-    // Also look for any div with class starting with 'tool-' that has data-tool attribute
-    const genericTools = document.querySelectorAll('div.tool-text[data-tool], div.tool-simpletext[data-tool]');
-    console.log(`Found ${genericTools.length} generic text tool elements`);
-    
-    genericTools.forEach(element => {
-        if (!element.classList.contains('tool-content') && !tools.includes(element)) {
-            console.log(`Adding generic text tool for text-only view:`, element);
-            tools.push(element);
-        }
-    });
-    
-    console.log(`RC Tool Commenter: Total tools for text-only view: ${tools.length}`);
-    return tools;
-}
 
 // Function to extract exposition and weave IDs from URL
 function extractFromUrl(type) {
@@ -417,188 +370,6 @@ async function storeToolsInMemory(tools) {
     // Save back to storage
     await browser.storage.local.set({ [storageKey]: expositionData });
     console.log(`Stored exposition data:`, expositionData);
-    
-    // Update button text to show total count across all weaves
-    await updateSaveButtonCount(expositionData);
-}
-
-// Function to update save button with total tool count
-async function updateSaveButtonCount(expositionData) {
-    console.log(`🔄 updateSaveButtonCount called`);
-    
-    const saveButton = document.getElementById('rc-save-tools-btn');
-    console.log(`🔍 Save button found:`, saveButton ? 'YES' : 'NO');
-    
-    if (!saveButton) return;
-    
-    const bodyElement = document.body;
-    const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
-    
-    // Count resolved comments and accepted suggestions across all weaves
-    let totalResolvedComments = 0;
-    let totalAcceptedSuggestions = 0;
-    
-    // Get resolved comments and accepted suggestions for each weave
-    for (const weaveId of Object.keys(expositionData.weaves)) {
-        console.log(`🔍 Checking weave ${weaveId} for resolved/accepted data...`);
-        
-        // Count resolved comments
-        const resolvedCommentsKey = `rc_resolved_comments_${expositionId}_${weaveId}`;
-        console.log(`🔍 Looking for resolved comments with key: ${resolvedCommentsKey}`);
-        const resolvedResult = await browser.storage.local.get(resolvedCommentsKey);
-        const resolvedComments = resolvedResult[resolvedCommentsKey] || {};
-        
-        console.log(`📊 Resolved comments data:`, resolvedComments);
-        
-        // Count resolved comments for each tool in this weave
-        Object.values(resolvedComments).forEach(toolComments => {
-            if (Array.isArray(toolComments)) {
-                console.log(`📊 Found ${toolComments.length} resolved comments for a tool`);
-                totalResolvedComments += toolComments.length;
-            }
-        });
-        
-        // Count accepted suggestions
-        const acceptedSuggestionsKey = `rc_accepted_suggestions_${expositionId}_${weaveId}`;
-        console.log(`🔍 Looking for accepted suggestions with key: ${acceptedSuggestionsKey}`);
-        const acceptedResult = await browser.storage.local.get(acceptedSuggestionsKey);
-        const acceptedSuggestions = acceptedResult[acceptedSuggestionsKey] || {};
-        
-        console.log(`📊 Accepted suggestions data:`, acceptedSuggestions);
-        
-        // Count accepted suggestions for each tool in this weave
-        Object.values(acceptedSuggestions).forEach(toolSuggestions => {
-            if (Array.isArray(toolSuggestions)) {
-                console.log(`📊 Found ${toolSuggestions.length} accepted suggestions for a tool`);
-                totalAcceptedSuggestions += toolSuggestions.length;
-            }
-        });
-    }
-    
-    console.log(`📊 Final counts: ${totalResolvedComments} resolved, ${totalAcceptedSuggestions} accepted`);
-    
-    let weaveCount = Object.keys(expositionData.weaves).length;
-    
-    const buttonText = saveButton.querySelector('span') || saveButton;
-    buttonText.innerHTML = `
-        <svg width="16" height="16" viewBox="0 0 16 16" style="margin-right: 6px;">
-            <path fill="currentColor" d="M13 0H3a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V3a3 3 0 0 0-3-3zM8 1.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zM11 14.5H5a.5.5 0 0 1 0-1h6a.5.5 0 0 1 0 1z"/>
-        </svg>
-        Save ${totalResolvedComments} Resolved Comments, ${totalAcceptedSuggestions} Accepted Suggestions (${weaveCount} weaves)
-    `;
-}
-
-// Function to update save button count after resolving/accepting actions
-async function updateSaveButtonCountAfterAction(expositionId) {
-    try {
-        console.log(`🔄 updateSaveButtonCountAfterAction called for exposition ${expositionId}`);
-        
-        // Get stored tools for this exposition  
-        const storageKey = `rc_exposition_${expositionId}`;
-        const result = await browser.storage.local.get(storageKey);
-        const expositionData = result[storageKey];
-        
-        console.log(`📊 Found exposition data:`, expositionData ? 'YES' : 'NO');
-        
-        if (expositionData) {
-            console.log(`🔄 Calling updateSaveButtonCount...`);
-            await updateSaveButtonCount(expositionData);
-            console.log(`✅ Save button count updated`);
-        } else {
-            console.warn(`⚠️ No exposition data found for ${expositionId}`);
-        }
-    } catch (error) {
-        console.error('❌ Error updating save button count:', error);
-    }
-}
-
-// Function to create save button
-function createSaveButton() {
-    // Skip creating save button in editor mode
-    if (isEditorMode) {
-        console.log('🚫 Skipping save button in editor mode');
-        return;
-    }
-    
-    // Remove existing button if present
-    const existingButton = document.getElementById('rc-save-tools-btn');
-    if (existingButton) {
-        existingButton.remove();
-    }
-    
-    const saveButton = document.createElement('button');
-    saveButton.id = 'rc-save-tools-btn';
-    saveButton.className = 'rc-save-button';
-    saveButton.innerHTML = `
-        <span>
-            <svg width="16" height="16" viewBox="0 0 16 16" style="margin-right: 6px;">
-                <path fill="currentColor" d="M13 0H3a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V3a3 3 0 0 0-3-3zM8 1.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zM11 14.5H5a.5.5 0 0 1 0-1h6a.5.5 0 0 1 0 1z"/>
-            </svg>
-            Save Tools as JSON
-        </span>
-    `;
-    
-    saveButton.addEventListener('click', () => {
-        saveAllToolsAsJSON();
-    });
-    
-    // Create import button
-    const importButton = document.createElement('button');
-    importButton.id = 'rc-import-tools-btn';
-    importButton.className = 'rc-import-button';
-    importButton.innerHTML = `
-        <span>
-            <svg width="16" height="16" viewBox="0 0 16 16" style="margin-right: 6px;">
-                <path fill="currentColor" d="M8.5 1.5A2.5 2.5 0 0 1 11 4v4.793l1.146-1.147a.5.5 0 0 1 .708.708L10.5 10.707a.5.5 0 0 1-.708 0L7.439 8.354a.5.5 0 1 1 .708-.708L9.5 8.793V4A1.5 1.5 0 0 0 8 2.5H3A1.5 1.5 0 0 0 1.5 4v8A1.5 1.5 0 0 0 3 13.5h5a.5.5 0 0 1 0 1H3A2.5 2.5 0 0 1 .5 12V4A2.5 2.5 0 0 1 3 1.5h5.5z"/>
-            </svg>
-            Import JSON
-        </span>
-    `;
-    importButton.title = 'Import suggestions from JSON file';
-    
-    // Create text-only view toggle button
-    const viewToggleButton = document.createElement('button');
-    viewToggleButton.id = 'rc-view-toggle-btn';
-    viewToggleButton.className = 'rc-view-toggle-button';
-    viewToggleButton.innerHTML = `
-        <span>
-            Text View
-        </span>
-    `;
-    viewToggleButton.title = 'Toggle between normal and text-only view';
-    
-    // Create disable extension button 
-    const disableButton = document.createElement('button');
-    disableButton.id = 'rc-disable-extension-btn';
-    disableButton.className = 'rc-disable-extension-button';
-    disableButton.innerHTML = `
-        <span>
-            <span id="rc-disable-button-text">Exit</span>
-        </span>
-    `;
-    disableButton.title = 'Disable/Enable extension';
-    
-    // Create hidden file input for import
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = '.json';
-    fileInput.style.display = 'none';
-    fileInput.id = 'rc-file-input';
-    
-    // Add click handlers
-    importButton.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', handleImportFile);
-    viewToggleButton.addEventListener('click', toggleTextOnlyView);
-    disableButton.addEventListener('click', toggleExtensionState);
-
-    // document.body.appendChild(saveButton);
-    // document.body.appendChild(importButton);
-    document.body.appendChild(viewToggleButton);
-    document.body.appendChild(disableButton);
-    document.body.appendChild(fileInput);
-    
-    // Initialize disable button state
-    updateDisableButtonState();
 }
 
 // Function to toggle extension enabled/disabled state
@@ -645,344 +416,38 @@ async function updateDisableButtonState() {
     }
 }
 
-// Function to save all tools from all visited weaves as JSON
-async function saveAllToolsAsJSON() {
-    const bodyElement = document.body;
-    const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
+// Function to create UI buttons (Text View toggle and Exit/Disable)
+function createExtensionButtons() {
+    // Remove existing buttons if present
+    const existingViewToggle = document.getElementById('rc-view-toggle-btn');
+    const existingDisable = document.getElementById('rc-disable-extension-btn');
+    if (existingViewToggle) existingViewToggle.remove();
+    if (existingDisable) existingDisable.remove();
     
-    // Get stored tools for this exposition
-    const storageKey = `rc_exposition_${expositionId}`;
-    const result = await browser.storage.local.get(storageKey);
-    const expositionData = result[storageKey];
+    // Create text-only view toggle button
+    const viewToggleButton = document.createElement('button');
+    viewToggleButton.id = 'rc-view-toggle-btn';
+    viewToggleButton.className = 'rc-view-toggle-button';
+    viewToggleButton.innerHTML = `<span>Text View</span>`;
+    viewToggleButton.title = 'Toggle between normal and text-only view';
+    viewToggleButton.addEventListener('click', toggleTextOnlyView);
     
-    if (!expositionData || !expositionData.weaves || Object.keys(expositionData.weaves).length === 0) {
-        showNotification('No tools found to save');
-        return;
-    }
+    // Create disable extension button 
+    const disableButton = document.createElement('button');
+    disableButton.id = 'rc-disable-extension-btn';
+    disableButton.className = 'rc-disable-extension-button';
+    disableButton.innerHTML = `<span><span id="rc-disable-button-text">Exit</span></span>`;
+    disableButton.title = 'Disable/Enable extension';
+    disableButton.addEventListener('click', toggleExtensionState);
     
-    console.log('RC Tool Commenter: Exporting exposition data:', expositionData);
+    // Add buttons to the page
+    document.body.appendChild(viewToggleButton);
+    document.body.appendChild(disableButton);
     
-    // Get all resolved comments and accepted suggestions for all weaves in this exposition
-    const allStorageKeys = await browser.storage.local.get();
-    const resolvedComments = {};
-    const acceptedSuggestions = {};
-    let totalResolvedComments = 0;
-    let totalAcceptedSuggestions = 0;
+    // Initialize button state
+    updateDisableButtonState();
     
-    console.log('🔍 Searching for resolved comments and accepted suggestions...');
-    console.log('All storage keys:', Object.keys(allStorageKeys).filter(k => k.startsWith('rc_')));
-    
-    // Find all resolved comments and accepted suggestions storage keys for this exposition
-    Object.keys(allStorageKeys).forEach(key => {
-        if (key.startsWith(`rc_resolved_comments_${expositionId}_`)) {
-            const weaveId = key.replace(`rc_resolved_comments_${expositionId}_`, '');
-            const resolvedData = allStorageKeys[key];
-            console.log(`📦 Found resolved comments for weave ${weaveId}:`, resolvedData);
-            console.log(`📦 Resolved data type:`, typeof resolvedData, 'keys:', Object.keys(resolvedData || {}));
-            if (resolvedData && typeof resolvedData === 'object' && Object.keys(resolvedData).length > 0) {
-                resolvedComments[weaveId] = resolvedData;
-                // Count total resolved comments
-                Object.values(resolvedData).forEach(toolComments => {
-                    if (Array.isArray(toolComments)) {
-                        totalResolvedComments += toolComments.length;
-                    }
-                });
-            }
-        } else if (key.startsWith(`rc_accepted_suggestions_${expositionId}_`)) {
-            const weaveId = key.replace(`rc_accepted_suggestions_${expositionId}_`, '');
-            const acceptedData = allStorageKeys[key];
-            console.log(`📦 Found accepted suggestions for weave ${weaveId}:`, acceptedData);
-            console.log(`📦 Accepted data type:`, typeof acceptedData, 'keys:', Object.keys(acceptedData || {}));
-            if (acceptedData && typeof acceptedData === 'object' && Object.keys(acceptedData).length > 0) {
-                acceptedSuggestions[weaveId] = acceptedData;
-                // Count total accepted suggestions
-                Object.values(acceptedData).forEach(toolSuggestions => {
-                    if (Array.isArray(toolSuggestions)) {
-                        totalAcceptedSuggestions += toolSuggestions.length;
-                    }
-                });
-            }
-        }
-    });
-    
-    console.log('📊 Export totals:', {
-        totalResolvedComments,
-        totalAcceptedSuggestions,
-        resolvedComments,
-        acceptedSuggestions
-    });
-    
-    // Calculate totals from the stored data (suggestions are already attached to tools)
-    let totalTools = 0;
-    let totalSuggestions = 0;
-    
-    Object.values(expositionData.weaves).forEach(weave => {
-        totalTools += weave.tools.length;
-        weave.tools.forEach(tool => {
-            totalSuggestions += tool.suggestionCount || 0;
-        });
-    });
-    
-    // Create comprehensive JSON structure
-    const exportData = {
-        exposition: {
-            id: expositionId,
-            exportTimestamp: new Date().toISOString(),
-            totalWeaves: Object.keys(expositionData.weaves).length,
-            totalTools: totalTools,
-            totalSuggestions: totalSuggestions,
-            totalResolvedComments: totalResolvedComments,
-            totalAcceptedSuggestions: totalAcceptedSuggestions
-        },
-        weaves: expositionData.weaves, // Use the weaves data as-is since it already contains suggestions
-        resolvedComments: resolvedComments, // Add resolved comments data
-        acceptedSuggestions: acceptedSuggestions // Add accepted suggestions data
-    };
-    
-    // Create downloadable JSON file
-    const jsonString = JSON.stringify(exportData, null, 2);
-    const blob = new Blob([jsonString], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    
-    // Create download link
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `rc-exposition-${expositionId}-tools-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    
-    // Show confirmation message with resolved comments and accepted suggestions info
-    const weaveCount = Object.keys(expositionData.weaves).length;
-    const toolCount = Object.values(expositionData.weaves).reduce((sum, weave) => sum + weave.tools.length, 0);
-    let statusMessage = `Saved ${toolCount} tools, ${totalSuggestions} active suggestions`;
-    
-    if (totalResolvedComments > 0 || totalAcceptedSuggestions > 0) {
-        const resolvedText = totalResolvedComments > 0 ? `${totalResolvedComments} resolved comments` : '';
-        const acceptedText = totalAcceptedSuggestions > 0 ? `${totalAcceptedSuggestions} accepted suggestions` : '';
-        const combinedText = [resolvedText, acceptedText].filter(Boolean).join(', ');
-        statusMessage += `, ${combinedText}`;
-    }
-    
-    statusMessage += ` from ${weaveCount} weaves`;
-    showNotification(statusMessage);
-}
-
-// Function to save tools as JSON (legacy - keeping for backwards compatibility)
-function saveToolsAsJSON() {
-    saveAllToolsAsJSON();
-}
-
-// Function to handle importing JSON file
-async function handleImportFile(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    
-    try {
-        const text = await file.text();
-        const importData = JSON.parse(text);
-        
-        // Validate the imported data structure
-        if (!importData.exposition?.id || !importData.weaves) {
-            throw new Error('Invalid JSON structure. Expected exposition data with weaves.');
-        }
-        
-        // Extract exposition ID from the correct location
-        const importedExpositionId = importData.exposition.id;
-        
-        // Get current exposition ID
-        const bodyElement = document.body;
-        const currentExpositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
-        
-        // Check if the imported data matches current exposition
-        if (importedExpositionId !== currentExpositionId) {
-            const confirmImport = confirm(
-                `The imported data is for exposition ${importedExpositionId}, but you're currently viewing exposition ${currentExpositionId}. ` +
-                'Do you want to import anyway? This will merge the suggestions with current data.'
-            );
-            if (!confirmImport) {
-                event.target.value = ''; // Reset file input
-                return;
-            }
-        }
-        
-        // Import the data
-        await importSuggestionData(importData, currentExpositionId);
-        
-        // Update save button count to reflect imported suggestions
-        const expositionStorageKey = `rc_exposition_${currentExpositionId}`;
-        const expositionResult = await browser.storage.local.get(expositionStorageKey);
-        if (expositionResult[expositionStorageKey]) {
-            await updateSaveButtonCount(expositionResult[expositionStorageKey]);
-        }
-        
-        // Show success message
-        showImportStatus('Success! Suggestions imported successfully.', 'success');
-        
-        // Refresh the current page view to show imported suggestions
-        setTimeout(async () => {
-            // Clear existing tool enhancements to allow re-processing
-            const existingTools = document.querySelectorAll('[data-rc-tool-enhanced]');
-            existingTools.forEach(tool => {
-                tool.removeAttribute('data-rc-tool-enhanced');
-                tool.style.cursor = '';
-                tool.style.outline = '';
-                tool.style.outlineOffset = '';
-            });
-            
-            // Remove existing buttons to avoid duplicates
-            const existingSaveBtn = document.getElementById('rc-save-tools-btn');
-            if (existingSaveBtn) existingSaveBtn.remove();
-            const existingImportBtn = document.getElementById('rc-import-tools-btn');
-            if (existingImportBtn) existingImportBtn.remove();
-            const existingFileInput = document.getElementById('rc-file-input');
-            if (existingFileInput) existingFileInput.remove();
-            
-            // Re-initialize the extension
-            await initializeExtension();
-        }, 300);
-        
-    } catch (error) {
-        console.error('Error importing JSON:', error);
-        showImportStatus('Error importing file: ' + error.message, 'error');
-    }
-    
-    // Reset file input
-    event.target.value = '';
-}
-
-// Function to import suggestion data into storage
-async function importSuggestionData(importData, targetExpositionId) {
-    const storageKey = `rc_exposition_${targetExpositionId}`;
-    
-    // Get existing data for this exposition
-    const existingResult = await browser.storage.local.get(storageKey);
-    const existingData = existingResult[storageKey] || { weaves: {} };
-    
-    // Merge imported weaves with existing data
-    for (const [weaveId, weaveData] of Object.entries(importData.weaves)) {
-        if (!existingData.weaves[weaveId]) {
-            existingData.weaves[weaveId] = {
-                tools: [],
-                url: weaveData.url,
-                pageTitle: weaveData.pageTitle,
-                visitedAt: weaveData.lastVisited || weaveData.visitedAt // Handle both formats
-            };
-        }
-        
-        // Merge tools and suggestions
-        for (const importedTool of weaveData.tools) {
-            const existingToolIndex = existingData.weaves[weaveId].tools.findIndex(
-                tool => tool.toolId === importedTool.id || tool.id === importedTool.id
-            );
-            
-            if (existingToolIndex >= 0) {
-                // Update existing tool with imported suggestions
-                const existingTool = existingData.weaves[weaveId].tools[existingToolIndex];
-                
-                // Merge suggestions, avoiding duplicates based on content and selected text
-                if (importedTool.suggestions && importedTool.suggestions.length > 0) {
-                    if (!existingTool.suggestions) {
-                        existingTool.suggestions = [];
-                    }
-                    
-                    for (const importedSuggestion of importedTool.suggestions) {
-                        const isDuplicate = existingTool.suggestions.some(existing => 
-                            existing.selectedText === importedSuggestion.selectedText &&
-                            existing.suggestionText === importedSuggestion.suggestionText
-                        );
-                        
-                        if (!isDuplicate) {
-                            // Assign new ID to avoid conflicts
-                            const newSuggestion = {
-                                ...importedSuggestion,
-                                id: Date.now() + Math.random(),
-                                importedAt: new Date().toISOString()
-                            };
-                            existingTool.suggestions.push(newSuggestion);
-                        }
-                    }
-                }
-            } else {
-                // Add new tool with its suggestions
-                const newTool = { ...importedTool };
-                if (newTool.suggestions) {
-                    // Assign new IDs to suggestions to avoid conflicts
-                    newTool.suggestions = newTool.suggestions.map(suggestion => ({
-                        ...suggestion,
-                        id: Date.now() + Math.random(),
-                        importedAt: new Date().toISOString()
-                    }));
-                }
-                existingData.weaves[weaveId].tools.push(newTool);
-            }
-        }
-    }
-    
-    // Save merged data back to storage
-    await browser.storage.local.set({ [storageKey]: existingData });
-    
-    // Import suggestions for ALL weaves in the exposition
-    for (const [weaveId, weaveData] of Object.entries(importData.weaves)) {
-        if (weaveData.tools) {
-            const suggestionsKey = `rc_suggestions_${targetExpositionId}_${weaveId}`;
-            const existingSuggestions = await browser.storage.local.get(suggestionsKey);
-            const suggestions = existingSuggestions[suggestionsKey] || {};
-            
-            // Import suggestions for each tool in this weave
-            for (const tool of weaveData.tools) {
-                if (tool.suggestions && tool.suggestions.length > 0) {
-                    const toolKey = tool.id || tool.toolId; // Handle both id formats
-                    if (!suggestions[toolKey]) {
-                        suggestions[toolKey] = [];
-                    }
-                    
-                    // Add imported suggestions with new IDs
-                    for (const suggestion of tool.suggestions) {
-                        const isDuplicate = suggestions[toolKey].some(existing => 
-                            existing.selectedText === suggestion.selectedText &&
-                            existing.suggestionText === suggestion.suggestionText
-                        );
-                        
-                        if (!isDuplicate) {
-                            suggestions[toolKey].push({
-                                ...suggestion,
-                                id: Date.now() + Math.random(),
-                                importedAt: new Date().toISOString()
-                            });
-                        }
-                    }
-                }
-            }
-            
-            // Save suggestions for this weave
-            await browser.storage.local.set({ [suggestionsKey]: suggestions });
-        }
-    }
-}
-
-// Function to show import status messages
-function showImportStatus(message, type = 'info') {
-    // Remove any existing status message
-    const existingStatus = document.getElementById('rc-import-status');
-    if (existingStatus) {
-        existingStatus.remove();
-    }
-    
-    const statusDiv = document.createElement('div');
-    statusDiv.id = 'rc-import-status';
-    statusDiv.className = `rc-import-status rc-import-${type}`;
-    statusDiv.textContent = message;
-    
-    document.body.appendChild(statusDiv);
-    
-    // Remove status message after 4 seconds
-    setTimeout(() => {
-        if (statusDiv.parentNode) {
-            statusDiv.remove();
-        }
-    }, 4000);
+    console.log('RC Tool Commenter: Extension buttons created');
 }
 
 // Global variable to track view state
@@ -1424,102 +889,6 @@ function showNormalView() {
     console.log('RC Tool Commenter: Normal view restoration complete');
 }
 
-// Function to re-initialize Research Catalogue's navigation functionality
-function reinitializeRCNavigation() {
-    try {
-        console.log('RC Tool Commenter: Debugging navigation structure...');
-        
-        // Debug: Check what navigation elements exist
-        const navigation = document.querySelector('#navigation');
-        if (navigation) {
-            console.log('Navigation found:', navigation);
-            console.log('Navigation HTML:', navigation.outerHTML.substring(0, 500) + '...');
-        } else {
-            console.log('Navigation element not found!');
-        }
-        
-        // Check for main menu
-        const mainMenu = document.querySelector('.mainmenu');
-        if (mainMenu) {
-            console.log('Main menu found:', mainMenu);
-            console.log('Main menu display style:', mainMenu.style.display);
-        } else {
-            console.log('Main menu not found!');
-        }
-        
-        // Check for menu items
-        const menuItems = document.querySelectorAll('.menu');
-        console.log('Menu items found:', menuItems.length);
-        menuItems.forEach((item, index) => {
-            console.log(`Menu item ${index}:`, item.className, item.querySelector('.caption')?.textContent);
-        });
-        
-        // Re-attach the menu toggle functionality
-        const menuToggleLinks = document.querySelectorAll('a[onclick*="next(\'ul\').toggle()"]');
-        console.log('Found menu toggle links:', menuToggleLinks.length);
-        menuToggleLinks.forEach(link => {
-            // Remove the onclick attribute and add proper event listener
-            link.removeAttribute('onclick');
-            link.addEventListener('click', function(e) {
-                e.preventDefault();
-                const nextUl = this.nextElementSibling;
-                if (nextUl && nextUl.tagName === 'UL') {
-                    if (nextUl.style.display === 'none' || !nextUl.style.display) {
-                        nextUl.style.display = 'block';
-                    } else {
-                        nextUl.style.display = 'none';
-                    }
-                }
-                return false;
-            });
-        });
-        
-        // Re-attach chapter highlighting functionality
-        const chapterLinks = document.querySelectorAll('a.chapter-entry[onclick*="highlightChapter"]');
-        console.log('Found chapter links:', chapterLinks.length);
-        chapterLinks.forEach(link => {
-            // Remove the onclick attribute and add proper event listener
-            link.removeAttribute('onclick');
-            link.addEventListener('click', function(e) {
-                // Remove highlight from all chapter entries
-                document.querySelectorAll('a.chapter-entry').forEach(chapter => {
-                    chapter.classList.remove('highlighted');
-                });
-                // Add highlight to current chapter
-                this.classList.add('highlighted');
-            });
-        });
-        
-        // Re-attach main menu icon functionality
-        const menuIcon = document.querySelector('#page-menu-icon');
-        const menuList = document.querySelector('#page-menu-list');
-        if (menuIcon && menuList) {
-            console.log('Menu icon and list found');
-            // Remove any existing onclick
-            menuIcon.removeAttribute('onclick');
-            menuIcon.addEventListener('click', function(e) {
-                e.preventDefault();
-                console.log('Menu icon clicked');
-                if (menuList.style.display === 'none' || !menuList.style.display) {
-                    menuList.style.display = 'block';
-                } else {
-                    menuList.style.display = 'none';
-                }
-            });
-        } else {
-            console.log('Menu icon or list not found:', !!menuIcon, !!menuList);
-        }
-        
-        console.log('RC Tool Commenter: Successfully re-initialized RC navigation');
-        
-        // Force CSS hover functionality by adding explicit styles
-        addNavigationCSS();
-        
-    } catch (error) {
-        console.error('RC Tool Commenter: Failed to re-initialize RC navigation:', error);
-    }
-}
-
 // Function to add/restore navigation CSS functionality
 function addNavigationCSS() {
     try {
@@ -1580,33 +949,6 @@ function addNavigationCSS() {
     }
 }
 
-
-
-// Function to highlight selected text
-function highlightSelectedText(range, container) {
-    // Clear previous highlights
-    clearHighlights(container);
-    
-    // Create highlight span
-    const highlight = document.createElement('span');
-    highlight.className = 'rc-text-highlight';
-    highlight.style.cssText = `
-        background: rgba(255, 235, 59, 0.6);
-        border: 1px solid rgba(255, 193, 7, 0.8);
-        border-radius: 2px;
-        padding: 1px 2px;
-    `;
-    
-    try {
-        range.surroundContents(highlight);
-    } catch (e) {
-        // Fallback for complex selections
-        const contents = range.extractContents();
-        highlight.appendChild(contents);
-        range.insertNode(highlight);
-    }
-}
-
 // Function to clear text highlights
 function clearHighlights(container) {
     const highlights = container.querySelectorAll('.rc-text-highlight');
@@ -1662,36 +1004,52 @@ async function saveSuggestion(tool, selection, suggestionText, type = 'suggestio
             showSuggestionTooltip(this, suggestion, selectedText, spanType);
         });
         
-        // Wrap the selected content using the range from the selection
-        if (selection.range) {
-            selection.range.surroundContents(span);
-        } else {
-            // Fallback: simple text replacement if no range available
-            const toolText = textContent.innerHTML;
-            const selectedText = selection.text;
-            if (toolText.includes(selectedText)) {
-                const spanHtml = `<span id="${spanId}" class="${cssClass}" data-suggestion="${suggestionText.replace(/"/g, '&quot;')}" data-selected-text="${selectedText.replace(/"/g, '&quot;')}" data-type="${type}">${selectedText}</span>`;
-                textContent.innerHTML = toolText.replace(selectedText, spanHtml);
-                // Re-add click handler to the newly created span
-                const newSpan = textContent.querySelector(`#${spanId}`);
-                if (newSpan) {
-                    newSpan.addEventListener('click', function(e) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        const suggestion = this.getAttribute('data-suggestion');
-                        const selectedText = this.getAttribute('data-selected-text');
-                        const spanType = this.getAttribute('data-type') || 'suggestion';
-                        showSuggestionTooltip(this, suggestion, selectedText, spanType);
-                    });
-                }
+        // Use index-based approach with saved range information
+        // This is more reliable than text replacement as it handles duplicate text correctly
+        if (selection.startContainer && selection.endContainer && selection.startOffset !== undefined && selection.endOffset !== undefined) {
+            // Get the actual start and end containers from the DOM (not from selection object which may be stale)
+            let startNode = selection.startContainer;
+            let endNode = selection.endContainer;
+            
+            // If containers are element nodes, get their text content
+            if (startNode.nodeType === Node.ELEMENT_NODE) {
+                startNode = startNode.childNodes[selection.startOffset] || startNode.lastChild;
             }
+            if (endNode.nodeType === Node.ELEMENT_NODE) {
+                endNode = endNode.childNodes[selection.endOffset] || endNode.lastChild;
+            }
+            
+            // Ensure we have text nodes
+            if (startNode && endNode) {
+                try {
+                    // Create a range with the saved offsets
+                    const newRange = document.createRange();
+                    newRange.setStart(startNode, selection.startOffset);
+                    newRange.setEnd(endNode, selection.endOffset);
+                    
+                    // Try to wrap using the newly created range
+                    newRange.surroundContents(span);
+                    console.log('RC Tool Commenter: Successfully wrapped selection using index-based range');
+                } catch (rangeError) {
+                    // If surroundContents still fails, fall back to manual node manipulation
+                    console.warn('RC Tool Commenter: Range surroundContents failed, using manual node splitting');
+                    
+                    // Extract the selected text content
+                    const selectedTextContent = newRange.extractContents();
+                    span.appendChild(selectedTextContent);
+                    newRange.insertNode(span);
+                    console.log('RC Tool Commenter: Wrapped selection using manual node splitting');
+                }
+            } else {
+                throw new Error('Could not locate start/end containers from selection');
+            }
+        } else {
+            throw new Error('Selection missing offset information');
         }
-        
-        console.log('RC Tool Commenter: Wrapped selection in span with ID:', spanId);
     } catch (error) {
         console.warn('RC Tool Commenter: Could not wrap selection in span:', error);
         // Check if error is due to nested or complex selection
-        if (error.message && (error.message.includes('not usable') || error.message.includes('not a valid'))) {
+        if (error.message && (error.message.includes('not usable') || error.message.includes('not a valid') || error.message.includes('not found'))) {
             throw new Error('Nested suggestions are not allowed. Please refine your selection');
         }
         throw new Error('Nested suggestions are not allowed. Please refine your selection');
@@ -1726,8 +1084,7 @@ async function saveSuggestion(tool, selection, suggestionText, type = 'suggestio
     
     console.log('Saved suggestion with span ID:', suggestion);
     
-    // **NEW: Apply suggestion to the actual tool via RC API**
-    console.log('🚀 Applying suggestion to RC tool...');
+    console.log('Applying suggestion to RC tool.');
     
     try {
         // Get current tool data to access htmlSpan content
@@ -1845,13 +1202,6 @@ async function saveSuggestion(tool, selection, suggestionText, type = 'suggestio
     
     // Update tool's stored data to include suggestion count
     await updateToolWithSuggestionCount(tool);
-    
-    // Update save button with new suggestion count
-    const expositionStorageKey = `rc_exposition_${expositionId}`;
-    const expositionResult = await browser.storage.local.get(expositionStorageKey);
-    if (expositionResult[expositionStorageKey]) {
-        await updateSaveButtonCount(expositionResult[expositionStorageKey]);
-    }
     
     // Re-store tools to update suggestion counts in export data
     const allTextTools = document.querySelectorAll('.tool-text, .tool-simpletext');
@@ -2236,9 +1586,6 @@ async function resolveComment(spanElement) {
         // Update the tool via RC API (pass spanInfo for proper removal)
         await updateToolAfterCommentResolution(tool, toolId, spanInfo);
         
-        // Update save button count to reflect the resolved comment
-        await updateSaveButtonCountAfterAction(expositionId);
-        
         console.log(`✅ Comment ${spanId} resolved successfully`);
         
     } catch (error) {
@@ -2268,46 +1615,6 @@ async function getResolvedComments(toolId = null) {
     } catch (error) {
         console.error('Error retrieving resolved comments:', error);
         return toolId ? [] : {};
-    }
-}
-
-// Function to get resolution statistics
-async function getResolutionStats() {
-    try {
-        const bodyElement = document.body;
-        const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
-        const weaveId = bodyElement.dataset.weave || extractFromUrl('weave') || 'unknown';
-        const resolvedStorageKey = `rc_resolved_comments_${expositionId}_${weaveId}`;
-        
-        const result = await browser.storage.local.get(resolvedStorageKey);
-        const resolvedComments = result[resolvedStorageKey] || {};
-        
-        let totalResolved = 0;
-        let resolutionsByTool = {};
-        let resolutionsByDate = {};
-        
-        Object.entries(resolvedComments).forEach(([toolId, comments]) => {
-            resolutionsByTool[toolId] = comments.length;
-            totalResolved += comments.length;
-            
-            comments.forEach(comment => {
-                if (comment.resolvedAt) {
-                    const dateKey = comment.resolvedAt.split('T')[0]; // Get just the date part
-                    resolutionsByDate[dateKey] = (resolutionsByDate[dateKey] || 0) + 1;
-                }
-            });
-        });
-        
-        return {
-            totalResolved,
-            resolutionsByTool,
-            resolutionsByDate,
-            weaveId,
-            expositionId
-        };
-    } catch (error) {
-        console.error('Error getting resolution stats:', error);
-        return null;
     }
 }
 
@@ -2461,9 +1768,6 @@ async function acceptSuggestion(spanElement) {
         
         // Update the tool via RC API (pass spanInfo for proper text replacement)
         await updateToolAfterSuggestionAcceptance(tool, toolId, spanInfo);
-        
-        // Update save button count to reflect the accepted suggestion
-        await updateSaveButtonCountAfterAction(expositionId);
         
         console.log(`✅ Suggestion ${spanId} accepted successfully`);
         
@@ -3436,109 +2740,6 @@ async function restoreToolHtmlSpan(tool, toolId, expositionData, weaveId) {
     }
 }
 
-
-// Function to show existing suggestions for a tool
-async function showToolSuggestions(tool) {
-    const bodyElement = document.body;
-    const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
-    const weaveId = extractFromUrl('weave') || bodyElement.dataset.weave || 'unknown';
-    const toolId = tool.dataset.id || 'unknown';
-    
-    // Get suggestions for this tool in the current weave
-    const storageKey = `rc_suggestions_${expositionId}_${weaveId}`;
-    const result = await browser.storage.local.get(storageKey);
-    const suggestions = result[storageKey] || {};
-    
-    const toolSuggestions = suggestions[toolId] || [];
-    
-    if (toolSuggestions.length === 0) {
-        showNotification('No suggestions found for this tool');
-        return;
-    }
-    
-    // Remove any existing suggestion viewer
-    const existingViewer = document.getElementById('rc-suggestion-viewer');
-    if (existingViewer) {
-        existingViewer.remove();
-    }
-    
-    // Create suggestion viewer overlay
-    const viewer = document.createElement('div');
-    viewer.id = 'rc-suggestion-viewer';
-    viewer.className = 'rc-suggestion-viewer';
-    
-    // Sort suggestions by timestamp (newest first)
-    const sortedSuggestions = toolSuggestions.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-    
-    viewer.innerHTML = `
-        <div class="rc-suggestion-viewer-header">
-            <h3>Suggestions for Tool ${toolId}</h3>
-            <button class="rc-close-viewer" title="Close">×</button>
-        </div>
-        <div class="rc-suggestion-viewer-content">
-            <div class="rc-suggestions-list">
-                ${sortedSuggestions.map((suggestion, index) => `
-                    <div class="rc-suggestion-item" data-span-id="${suggestion.spanId || ''}">
-                        <div class="rc-suggestion-meta">
-                            <span class="rc-suggestion-number">#${index + 1}</span>
-                            <span class="rc-suggestion-date">${formatDate(suggestion.timestamp)}</span>
-                            <span class="rc-suggestion-weave">Weave ${suggestion.weaveId}</span>
-                            ${suggestion.spanId ? `<span class="rc-suggestion-span-id">Span: ${suggestion.spanId}</span>` : ''}
-                        </div>
-                        <div class="rc-suggestion-selected-text">
-                            <label>Selected text:</label>
-                            <div class="rc-selected-text-display">"${suggestion.selectedText}"</div>
-                        </div>
-                        <div class="rc-suggestion-content">
-                            <label>Suggestion:</label>
-                            <div class="rc-suggestion-text">${suggestion.suggestion}</div>
-                        </div>
-                        <div class="rc-suggestion-actions">
-                            ${suggestion.spanId ? `
-                                <button class="rc-highlight-span" data-span-id="${suggestion.spanId}" title="Highlight this suggestion in text">
-                                    <svg width="14" height="14" viewBox="0 0 16 16">
-                                        <path fill="currentColor" d="M8.5 2.687c.654-.689 1.782-.886 3.112-.752 1.234.124 2.503.523 3.388.893v9.923c-.918-.35-2.107-.692-3.287-.81-1.094-.111-2.278-.039-3.213.492V2.687zM8 1.783C7.015.936 5.587.81 4.287.94c-1.514.153-3.042.672-3.994 1.105A.5.5 0 0 0 0 2.5v11a.5.5 0 0 0 .707.455c.882-.4 2.303-.881 3.68-1.02 1.409-.142 2.59.087 3.223.877a.5.5 0 0 0 .78 0c.633-.79 1.814-1.019 3.222-.877 1.378.139 2.8.62 3.681 1.02A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.293-.455c-.952-.433-2.48-.952-3.994-1.105C10.413.809 8.985.936 8 1.783z"/>
-                                    </svg>
-                                    Locate
-                                </button>
-                            ` : ''}
-                            <button class="rc-delete-suggestion" data-suggestion-id="${suggestion.id}" title="Delete this suggestion">
-                                <svg width="14" height="14" viewBox="0 0 16 16">
-                                    <path fill="currentColor" d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
-                                    <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
-                                </svg>
-                                Delete
-                            </button>
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-        </div>
-    `;
-    
-    // Position and style the viewer
-    viewer.style.cssText = `
-        position: fixed;
-        top: 50px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 600px;
-        max-width: 90vw;
-        max-height: 80vh;
-        background: white;
-        border: 2px solid #dc3545;
-        border-radius: 8px;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-        z-index: 10001;
-        overflow-y: auto;
-    `;
-    
-    document.body.appendChild(viewer);
-    
-    // Set up event handlers
-    setupSuggestionViewerHandlers(viewer, tool);
-}
-
 // Function to format date for display
 function formatDate(timestamp) {
     const date = new Date(timestamp);
@@ -3634,13 +2835,6 @@ async function deleteSuggestion(suggestionId, tool) {
     
     // Save updated suggestions
     await browser.storage.local.set({ [storageKey]: suggestions });
-    
-    // Update save button
-    const expositionStorageKey = `rc_exposition_${expositionId}`;
-    const expositionResult = await browser.storage.local.get(expositionStorageKey);
-    if (expositionResult[expositionStorageKey]) {
-        await updateSaveButtonCount(expositionResult[expositionStorageKey]);
-    }
 }
 
 // ========================================
@@ -3971,6 +3165,9 @@ async function initializeExtension() {
     
     console.log('RC Tool Commenter: Initializing on exposition page');
     
+    // Create UI buttons (Text View toggle and Exit)
+    createExtensionButtons();
+    
     // Extract weave ID for logging and processing
     const weaveId = bodyElement.dataset.weave || extractFromUrl('weave') || 'unknown';
     
@@ -4050,11 +3247,6 @@ async function initializeExtension() {
                 }
             }
         }, true); // Use capture phase to intercept before editor handlers
-    }
-    
-    // Update button with existing counts if available
-    if (result[storageKey]) {
-        await updateSaveButtonCount(result[storageKey]);
     }
     
     // Watch for dynamically added content (scoped to specific containers)
