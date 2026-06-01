@@ -7,6 +7,123 @@ console.log('RC Tool Commenter: Content script loaded');
 const isEditorMode = window.location.pathname.includes('/editor') || document.body.classList.contains('editor-block');
 console.log('RC Tool Commenter: Mode detected:', isEditorMode ? 'EDITOR' : 'VIEWER');
 
+// Function to convert a simpletext tool to an html tool
+async function convertSimpleTextToHtmlTool(toolId) {
+    try {
+        const bodyElement = document.body;
+        const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
+        const weaveId = bodyElement.dataset.weave || extractFromUrl('weave') || 'unknown';
+        
+        console.log(`🔄 Converting tool ${toolId} from simpletext to html...`);
+        console.log(`   Exposition: ${expositionId}, Weave: ${weaveId}`);
+        
+        // Step 1: Clear the content via update-content endpoint
+        const updateContentUrl = `${window.location.origin}/editor/${expositionId}/${weaveId}/tools/${toolId}/update-content`;
+        console.log(`📤 Clearing content at: ${updateContentUrl}`);
+        
+        const updateResponse = await fetch(updateContentUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: 'content='
+        });
+        
+        if (!updateResponse.ok) {
+            throw new Error(`Failed to clear tool content: ${updateResponse.status}`);
+        }
+        console.log('✅ Content cleared');
+        
+        // Step 2: Get conversion form
+        const convertFormUrl = `${window.location.origin}/editor/${expositionId}/${weaveId}/tools/${toolId}/convert`;
+        console.log(`📥 Getting conversion form at: ${convertFormUrl}`);
+        
+        const formResponse = await fetch(convertFormUrl, {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        
+        if (!formResponse.ok) {
+            console.error(`❌ GET request to ${convertFormUrl} failed with status ${formResponse.status}`);
+            // Log the response body for debugging
+            const responseText = await formResponse.text();
+            console.error(`Response body: ${responseText.substring(0, 200)}`);
+            throw new Error(`Failed to get conversion form: ${formResponse.status}`);
+        }
+        
+        const formHtml = await formResponse.text();
+        console.log('✅ Conversion form retrieved');
+        
+        // Step 3: Parse form and extract token
+        const parser = new DOMParser();
+        const formDoc = parser.parseFromString(formHtml, 'text/html');
+        const tokenInput = formDoc.querySelector('input[name="form[_token_placeholder]"]');
+        const token = tokenInput ? tokenInput.value : '';
+        
+        console.log(`📋 Form token: ${token.substring(0, 20)}...`);
+        
+        // Step 4: Submit conversion form
+        const convertUrl = `${window.location.origin}/editor/${expositionId}/${weaveId}/tools/${toolId}/convert`;
+        console.log(`📤 Submitting conversion form to: ${convertUrl}`);
+        
+        const formData = new URLSearchParams();
+        formData.append('form[_token_placeholder]', token);
+        formData.append('form[_buttons][submit]', '');
+        
+        const submitResponse = await fetch(convertUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: formData.toString()
+        });
+        
+        if (!submitResponse.ok) {
+            throw new Error(`Failed to submit conversion: ${submitResponse.status}`);
+        }
+        console.log('✅ Conversion submitted');
+        
+        // Step 5: Refresh tool view
+        const showUrl = `${window.location.origin}/editor/${expositionId}/${weaveId}/tools/${toolId}/show`;
+        console.log(`👁️ Refreshing tool view at: ${showUrl}`);
+        
+        const showResponse = await fetch(showUrl, {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        
+        if (!showResponse.ok) {
+            throw new Error(`Failed to refresh tool: ${showResponse.status}`);
+        }
+        
+        const updatedToolHtml = await showResponse.text();
+        console.log('✅ Tool view refreshed');
+        
+        // Step 6: Update DOM with new tool
+        const oldTool = document.querySelector(`[data-id="${toolId}"]`);
+        if (oldTool) {
+            const newToolDiv = document.createElement('div');
+            newToolDiv.innerHTML = updatedToolHtml;
+            const newTool = newToolDiv.firstElementChild;
+            oldTool.parentNode.replaceChild(newTool, oldTool);
+            console.log(`🔄 Tool ${toolId} updated in DOM`);
+        }
+        
+        console.log(`✅ Successfully converted tool ${toolId} to html tool`);
+        return true;
+        
+    } catch (error) {
+        console.error('❌ Error converting tool:', error);
+        throw error;
+    }
+}
+
 // Check if user has edit permissions for the current exposition
 async function checkEditPermissions(expositionId) {
     // Use cached result if it's recent (within 5 minutes)
@@ -2377,42 +2494,53 @@ async function convertSimpletextToHtml(toolElement, toolId) {
         // Get current page context
         const bodyElement = document.body;
         const expositionId = bodyElement.dataset.research || extractFromUrl('exposition') || 'unknown';
-        
-        // Construct the conversion API URL
+        const weaveId = bodyElement.dataset.weave || extractFromUrl('weave') || 'unknown';
         const baseUrl = window.location.origin;
-        const conversionUrl = `${baseUrl}/item/convert?item=${toolId}&research=${expositionId}`;
         
-        console.log(`📡 RC API: Conversion URL: ${conversionUrl}`);
+        console.log(`📡 RC API: Using exposition=${expositionId}, weave=${weaveId}`);
         
-        // Step 1: GET the conversion form (confirmation dialog)
+        // Step 1: GET the conversion form
         console.log(`📡 RC API: Step 1 - Getting conversion confirmation form...`);
+        const conversionUrl = `${baseUrl}/editor/${expositionId}/${weaveId}/tools/${toolId}/convert`;
         const getResponse = await fetch(conversionUrl, {
             method: 'GET',
             headers: {
                 'X-Requested-With': 'XMLHttpRequest'
-            },
-            credentials: 'same-origin'
+            }
         });
         
         console.log(`📡 RC API: GET response status: ${getResponse.status}`);
         
         if (!getResponse.ok) {
+            const errorText = await getResponse.text();
+            console.error(`📡 RC API: GET request failed. Response: ${errorText.substring(0, 200)}`);
             throw new Error(`GET request failed with status ${getResponse.status}`);
         }
         
         const formHtml = await getResponse.text();
         console.log(`📡 RC API: Received confirmation form (${formHtml.length} chars)`);
         
+        // Parse form and extract token
+        const parser = new DOMParser();
+        const formDoc = parser.parseFromString(formHtml, 'text/html');
+        const tokenInput = formDoc.querySelector('input[name="form[_token_placeholder]"]');
+        const token = tokenInput ? tokenInput.value : '';
+        
+        console.log(`📡 RC API: Extracted form token`);
+        
         // Step 2: POST the conversion confirmation
         console.log(`📡 RC API: Step 2 - Confirming conversion...`);
+        const formData = new URLSearchParams();
+        formData.append('form[_token_placeholder]', token);
+        formData.append('form[_buttons][submit]', '');
+        
         const postResponse = await fetch(conversionUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'X-Requested-With': 'XMLHttpRequest'
             },
-            body: 'confirmation=confirmation&yesbutton=yesbutton',
-            credentials: 'same-origin'
+            body: formData.toString()
         });
         
         console.log(`📡 RC API: POST response status: ${postResponse.status}`);
@@ -2426,19 +2554,18 @@ async function convertSimpletextToHtml(toolElement, toolId) {
         
         // Step 3: GET the updated tool
         console.log(`📡 RC API: Step 3 - Fetching updated tool...`);
-        const listUrl = `${baseUrl}/item/list?item=${toolId}`;
-        const listResponse = await fetch(listUrl, {
+        const showUrl = `${baseUrl}/editor/${expositionId}/${weaveId}/tools/${toolId}/show`;
+        const showResponse = await fetch(showUrl, {
             method: 'GET',
             headers: {
                 'X-Requested-With': 'XMLHttpRequest'
-            },
-            credentials: 'same-origin'
+            }
         });
         
-        console.log(`📡 RC API: Tool list response status: ${listResponse.status}`);
+        console.log(`📡 RC API: Tool show response status: ${showResponse.status}`);
         
-        if (listResponse.ok) {
-            const updatedHtml = await listResponse.text();
+        if (showResponse.ok) {
+            const updatedHtml = await showResponse.text();
             console.log(`📡 RC API: Updated tool HTML (${updatedHtml.length} chars)`);
             
             // Update the tool in the DOM
@@ -2465,7 +2592,7 @@ async function convertSimpletextToHtml(toolElement, toolId) {
                 throw new Error('Updated tool not found in response');
             }
         } else {
-            throw new Error(`Tool list request failed with status ${listResponse.status}`);
+            throw new Error(`Tool show request failed with status ${showResponse.status}`);
         }
         
         console.log(`✅ Successfully converted simpletext tool ${toolId} to HTML text tool`);
