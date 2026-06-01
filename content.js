@@ -16,35 +16,22 @@ async function checkEditPermissions(expositionId) {
         return permissionCheckCache;
     }
     
-    const permUrl = `https://www.researchcatalogue.net/editor/permissions?research=${expositionId}`;
     try {
+        // Test access to the editor page - if we get a 200, user has permissions
+        const editorUrl = `${window.location.origin}/editor/${expositionId}`;
         console.log('RC Tool Commenter: Checking edit permissions for exposition', expositionId);
-        console.log('RC Tool Commenter: Permission URL:', permUrl);
+        console.log('RC Tool Commenter: Permission test URL:', editorUrl);
         
-        const resp = await fetch(permUrl, { method: 'GET', credentials: 'include' });
+        const resp = await fetch(editorUrl, { method: 'GET', credentials: 'include' });
         
         console.log('RC Tool Commenter: Permission response status:', resp.status);
-        console.log('RC Tool Commenter: Permission response headers:', Object.fromEntries(resp.headers.entries()));
         
-        // Try to read the response body for more info
-        const responseText = await resp.text();
-        console.log('RC Tool Commenter: Permission response body:', responseText.substring(0, 200), responseText.length > 200 ? '...' : '');
+        let hasPermissions = resp.status === 200;
         
-        let hasPermissions = false;
-        
-        if (resp && resp.status === 200) {
-            // Status 200 is not enough - we need an empty response body
-            // If we get HTML content, it means we're being redirected to a login page or error page
-            if (responseText.trim() === '') {
-                console.log('RC Tool Commenter: Edit permissions granted (200 + empty body)');
-                hasPermissions = true;
-            } else {
-                console.log('RC Tool Commenter: Edit permissions denied (200 but HTML content - likely login page)');
-                hasPermissions = false;
-            }
+        if (hasPermissions) {
+            console.log('RC Tool Commenter: Edit permissions granted (status 200)');
         } else {
             console.log('RC Tool Commenter: Edit permissions denied (status:', resp.status, ')');
-            hasPermissions = false;
         }
         
         // Cache the result
@@ -1743,7 +1730,7 @@ async function updateToolAfterCommentResolution(tool, toolId, spanInfo) {
         const weaveId = bodyElement.dataset.weave || extractFromUrl('weave') || 'unknown';
         
         // Step 1: Fetch current tool content from Research Catalogue
-        const editUrl = `${window.location.origin}/item/edit?item=${toolId}&research=${expositionId}`;
+        const editUrl = `${window.location.origin}/editor/${expositionId}/${weaveId}/tools/${toolId}/edit`;
         const editResponse = await fetch(editUrl, {
             method: 'GET',
             headers: {
@@ -1763,7 +1750,9 @@ async function updateToolAfterCommentResolution(tool, toolId, spanInfo) {
         const doc = parser.parseFromString(editHtml, 'text/html');
         
         // Find the content field (could be different names depending on tool type)
-        const contentField = doc.querySelector('textarea[name="media[textcontent]"]') ||
+        const contentField = doc.querySelector('textarea[name="form[media][textContent]"]') ||
+                           doc.querySelector('textarea[name="form[media][content]"]') ||
+                           doc.querySelector('textarea[name="media[textcontent]"]') ||
                            doc.querySelector('textarea[name="media[content]"]') ||
                            doc.querySelector('textarea[name="textcontent"]');
         
@@ -1788,13 +1777,13 @@ async function updateToolAfterCommentResolution(tool, toolId, spanInfo) {
             }
         }
         
-        // Step 4: Prepare form data for update
-        const formData = new URLSearchParams();
+        // Step 4: Prepare form data for update using FormData (multipart)
+        const formData = new FormData();
         
         // Copy all existing form fields from the edit form
         const formElements = doc.querySelectorAll('input, textarea, select');
         formElements.forEach(element => {
-            if (element.name && element.name !== 'media[textcontent]' && element.name !== 'media[content]') {
+            if (element.name && !element.name.startsWith('form[media]')) {
                 if (element.type === 'checkbox' || element.type === 'radio') {
                     if (element.checked) {
                         formData.append(element.name, element.value);
@@ -1805,26 +1794,19 @@ async function updateToolAfterCommentResolution(tool, toolId, spanInfo) {
             }
         });
         
-        // Set the updated content
-        const contentFieldName = contentField.name;
-        formData.set(contentFieldName, currentContent);
-        
-        // Add submit button
-        if (!formData.has('submitbutton')) {
-            formData.append('submitbutton', 'submitbutton');
-        }
+        // Set the updated content using new field name format
+        formData.set('form[media][textContent]', currentContent);
         
         console.log('📤 Sending update request to RC...');
         
         // Step 5: Submit the update to Research Catalogue
-        const updateUrl = `${window.location.origin}/item/edit?item=${toolId}&research=${expositionId}`;
+        const updateUrl = `${window.location.origin}/editor/${expositionId}/${weaveId}/tools/${toolId}/edit`;
         const updateResponse = await fetch(updateUrl, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
                 'X-Requested-With': 'XMLHttpRequest'
             },
-            body: formData.toString()
+            body: formData
         });
         
         if (!updateResponse.ok) {
@@ -1832,8 +1814,8 @@ async function updateToolAfterCommentResolution(tool, toolId, spanInfo) {
         }
         
         // Check if update was successful
-        const hasValidationHeader = updateResponse.headers.get('Form-Validation');
-        if (hasValidationHeader === '1') {
+        const rcFormStatus = updateResponse.headers.get('rc-form-status');
+        if (rcFormStatus === 'success') {
             console.log('✅ RC tool updated successfully after comment resolution!');
             
             // Step 6: Update our local storage to reflect the changes
@@ -1881,7 +1863,7 @@ async function updateToolAfterSuggestionAcceptance(tool, toolId, spanInfo) {
         const weaveId = bodyElement.dataset.weave || extractFromUrl('weave') || 'unknown';
         
         // Step 1: Fetch current tool content from Research Catalogue
-        const editUrl = `${window.location.origin}/item/edit?item=${toolId}&research=${expositionId}`;
+        const editUrl = `${window.location.origin}/editor/${expositionId}/${weaveId}/tools/${toolId}/edit`;
         const editResponse = await fetch(editUrl, {
             method: 'GET',
             headers: {
@@ -1901,7 +1883,9 @@ async function updateToolAfterSuggestionAcceptance(tool, toolId, spanInfo) {
         const doc = parser.parseFromString(editHtml, 'text/html');
         
         // Find the content field (could be different names depending on tool type)
-        const contentField = doc.querySelector('textarea[name="media[textcontent]"]') ||
+        const contentField = doc.querySelector('textarea[name="form[media][textContent]"]') ||
+                           doc.querySelector('textarea[name="form[media][content]"]') ||
+                           doc.querySelector('textarea[name="media[textcontent]"]') ||
                            doc.querySelector('textarea[name="media[content]"]') ||
                            doc.querySelector('textarea[name="textcontent"]');
         
@@ -1927,13 +1911,13 @@ async function updateToolAfterSuggestionAcceptance(tool, toolId, spanInfo) {
             }
         }
         
-        // Step 4: Prepare form data for update
-        const formData = new URLSearchParams();
+        // Step 4: Prepare form data for update using FormData (multipart)
+        const formData = new FormData();
         
         // Copy all existing form fields from the edit form
         const formElements = doc.querySelectorAll('input, textarea, select');
         formElements.forEach(element => {
-            if (element.name && element.name !== 'media[textcontent]' && element.name !== 'media[content]') {
+            if (element.name && !element.name.startsWith('form[media]')) {
                 if (element.type === 'checkbox' || element.type === 'radio') {
                     if (element.checked) {
                         formData.append(element.name, element.value);
@@ -1944,26 +1928,19 @@ async function updateToolAfterSuggestionAcceptance(tool, toolId, spanInfo) {
             }
         });
         
-        // Set the updated content
-        const contentFieldName = contentField.name;
-        formData.set(contentFieldName, currentContent);
-        
-        // Add submit button
-        if (!formData.has('submitbutton')) {
-            formData.append('submitbutton', 'submitbutton');
-        }
+        // Set the updated content using new field name format
+        formData.set('form[media][textContent]', currentContent);
         
         console.log('📤 Sending update request to RC...');
         
         // Step 5: Submit the update to Research Catalogue
-        const updateUrl = `${window.location.origin}/item/edit?item=${toolId}&research=${expositionId}`;
+        const updateUrl = `${window.location.origin}/editor/${expositionId}/${weaveId}/tools/${toolId}/edit`;
         const updateResponse = await fetch(updateUrl, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
                 'X-Requested-With': 'XMLHttpRequest'
             },
-            body: formData.toString()
+            body: formData
         });
         
         if (!updateResponse.ok) {
@@ -1971,8 +1948,8 @@ async function updateToolAfterSuggestionAcceptance(tool, toolId, spanInfo) {
         }
         
         // Check if update was successful
-        const hasValidationHeader = updateResponse.headers.get('Form-Validation');
-        if (hasValidationHeader === '1') {
+        const rcFormStatus = updateResponse.headers.get('rc-form-status');
+        if (rcFormStatus === 'success') {
             console.log('✅ RC tool updated successfully after suggestion acceptance!');
             
             // Step 6: Update our local storage to reflect the changes
@@ -2667,8 +2644,12 @@ async function deleteSuggestion(suggestionId, tool) {
  */
 async function updateToolContent(toolId, newContent, researchId) {
     try {
+        // Get weaveId from URL or data attributes
+        const urlMatch = window.location.pathname.match(/\/editor\/(\d+)\/(\d+)/);
+        const weaveId = document.body?.dataset.weave || (urlMatch ? urlMatch[2] : 'unknown');
+        
         // First, get current tool data
-        const editResponse = await fetch(`/item/edit?item=${toolId}&research=${researchId}`, {
+        const editResponse = await fetch(`/editor/${researchId}/${weaveId}/tools/${toolId}/edit`, {
             method: 'GET',
             headers: {
                 'X-Requested-With': 'XMLHttpRequest'
@@ -2695,7 +2676,7 @@ async function updateToolContent(toolId, newContent, researchId) {
         }
         
         // Update the text content with our new content
-        formData.append('media[textcontent]', newContent);
+        formData.set('form[media][textContent]', newContent);
         
         // Style fields (preserve existing styling)
         const styleFields = [
@@ -2727,13 +2708,12 @@ async function updateToolContent(toolId, newContent, researchId) {
         formData.append('submitbutton', 'submitbutton');
         
         // Send the update request
-        const updateResponse = await fetch(`/item/edit?item=${toolId}&research=${researchId}`, {
+        const updateResponse = await fetch(`/editor/${researchId}/${weaveId}/tools/${toolId}/edit`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
                 'X-Requested-With': 'XMLHttpRequest'
             },
-            body: formData.toString()
+            body: formData
         });
         
         if (!updateResponse.ok) {
@@ -2741,10 +2721,9 @@ async function updateToolContent(toolId, newContent, researchId) {
         }
         
         // Verify the update was successful by checking the response
-        const responseText = await updateResponse.text();
-        const hasValidationHeader = updateResponse.headers.get('Form-Validation');
+        const hasValidationHeader = updateResponse.headers.get('rc-form-status');
         
-        if (hasValidationHeader === '1') {
+        if (hasValidationHeader === 'success') {
             console.log(`✓ Successfully updated tool ${toolId}`);
             return true;
         } else {
@@ -2762,6 +2741,10 @@ async function updateToolContent(toolId, newContent, researchId) {
  */
 async function applySuggestionToTool(toolId, originalText, suggestionText, researchId) {
     try {
+        // Get weaveId from URL or data attributes
+        const urlMatch = window.location.pathname.match(/\/editor\/(\d+)\/(\d+)/);
+        const weaveId = document.body?.dataset.weave || (urlMatch ? urlMatch[2] : 'unknown');
+        
         // Get current research ID if not provided
         if (!researchId) {
             const urlParams = new URLSearchParams(window.location.search);
@@ -2769,7 +2752,7 @@ async function applySuggestionToTool(toolId, originalText, suggestionText, resea
         }
         
         // Get current tool content
-        const editResponse = await fetch(`/item/edit?item=${toolId}&research=${researchId}`, {
+        const editResponse = await fetch(`/editor/${researchId}/${weaveId}/tools/${toolId}/edit`, {
             method: 'GET',
             headers: {
                 'X-Requested-With': 'XMLHttpRequest'
@@ -3165,7 +3148,102 @@ function injectRCToolUpdateFunctions() {
         // Add functions to the page's actual global scope (not content script scope)
         const script = document.createElement('script');
         script.setAttribute('data-rc-functions-injected', 'true');
-        script.textContent = 'window.testRCToolUpdate = async function(toolId, originalText, suggestionText) { const urlParams = new URLSearchParams(window.location.search); let researchId = urlParams.get("research"); if (!researchId) { const pathMatch = window.location.pathname.match(/\\/view\\/(\\d+)/); if (pathMatch) { researchId = pathMatch[1]; } } if (!researchId) { researchId = document.body.dataset.research; } if (!researchId) { console.error("❌ Could not find research ID. Current URL:", window.location.href); console.log("💡 You might need to be on the editor page: /editor?research=1731661&weave=1732783"); return false; } console.log("🧪 Testing RC tool update:", { toolId, originalText, suggestionText, researchId }); console.log("📍 Current page:", window.location.href); console.log("🔍 Research ID extraction method:", researchId ? "success" : "failed"); try { const editResponse = await fetch("/item/edit?item=" + toolId + "&research=" + researchId, { method: "GET", headers: { "X-Requested-With": "XMLHttpRequest" } }); if (!editResponse.ok) { throw new Error("Failed to fetch tool data: " + editResponse.status); } const editHtml = await editResponse.text(); console.log("✓ Successfully fetched tool edit form"); const parser = new DOMParser(); const doc = parser.parseFromString(editHtml, "text/html"); const isBlockWeave = document.documentElement.classList.contains("weave-block"); console.log("🔍 Weave type detected:", isBlockWeave ? "Block" : "Graphical"); const contentTextarea = doc.querySelector("textarea[name=\\"media[textcontent]\\"]"); if (!contentTextarea) { throw new Error("Could not find media[textcontent] textarea"); } const currentContent = contentTextarea.value; if (!currentContent) { throw new Error("Content textarea found but is empty"); } console.log("📝 Current content preview:", currentContent.substring(0, 200)); console.log("📝 Content field name: media[textcontent]"); const escapeHtml = (text) => { const div = document.createElement("div"); div.textContent = text; return div.innerHTML; }; const suggestionSpan = "<span class=\\"ai-suggestion\\" data-original=\\"" + escapeHtml(originalText) + "\\" data-suggestion=\\"" + escapeHtml(suggestionText) + "\\" title=\\"AI Suggestion: " + escapeHtml(suggestionText) + "\\">" + suggestionText + "</span>"; const enhancedContent = currentContent.replace(originalText, suggestionSpan); if (enhancedContent === currentContent) { console.warn("⚠ No text was replaced - original text not found"); return false; } console.log("🔄 Enhanced content preview:", enhancedContent.substring(0, 200)); console.log("✅ Test completed successfully! Ready to apply changes."); console.log("📌 To actually apply: Use this enhanced content in updateToolContent()"); return { success: true, originalContent: currentContent, enhancedContent: enhancedContent, toolId: toolId, researchId: researchId, isBlockWeave: isBlockWeave }; } catch (error) { console.error("✗ Error in test:", error); return { success: false, error: error.message }; } }; window.applyRCToolUpdate = async function(toolId, enhancedContent, researchId) { console.log("🚀 Applying update to tool", toolId); try { const editResponse = await fetch("/item/edit?item=" + toolId + "&research=" + researchId, { method: "GET", headers: { "X-Requested-With": "XMLHttpRequest" } }); if (!editResponse.ok) { throw new Error("Failed to fetch tool data: " + editResponse.status); } const editHtml = await editResponse.text(); const parser = new DOMParser(); const doc = parser.parseFromString(editHtml, "text/html"); const isBlockWeave = document.documentElement.classList.contains("weave-block"); console.log("🔍 Weave type detected:", isBlockWeave ? "Block" : "Graphical"); const contentTextarea = doc.querySelector("textarea[name=\\"media[textcontent]\\"]"); if (!contentTextarea) { throw new Error("Could not find media[textcontent] textarea"); } console.log("📝 Content field name: media[textcontent]"); let formattedContent; if (isBlockWeave) { formattedContent = "<!DOCTYPE html PUBLIC \\"-//W3C//DTD HTML 4.0 Transitional//EN\\" \\"http://www.w3.org/TR/REC-html40/loose.dtd\\">\\n<html><body>" + enhancedContent + "</body></html>"; console.log("📝 Content format: Full HTML document (block weave)"); } else { formattedContent = enhancedContent; console.log("📝 Content format: Simple content (graphical weave)"); } const formData = new URLSearchParams(); console.log("🔍 Collecting all form fields..."); const allInputs = doc.querySelectorAll("input, textarea, select"); console.log("📋 Found", allInputs.length, "form fields"); allInputs.forEach(input => { const name = input.name; const value = input.value || ""; if (name && name !== "media[textcontent]") { formData.append(name, value); console.log("📝 Added field:", name, "=", value.length > 50 ? value.substring(0, 50) + "..." : value); } }); formData.set("media[textcontent]", formattedContent); console.log("📝 Set content field: media[textcontent] =", formattedContent.length + " chars"); if (!formData.has("submitbutton")) { formData.append("submitbutton", "submitbutton"); } console.log("📤 Sending update request..."); console.log("📋 Total form fields:", formData.size); const updateResponse = await fetch("/item/edit?item=" + toolId + "&research=" + researchId, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", "X-Requested-With": "XMLHttpRequest" }, body: formData.toString() }); if (!updateResponse.ok) { throw new Error("Failed to update tool: " + updateResponse.status); } const hasValidationHeader = updateResponse.headers.get("Form-Validation"); if (hasValidationHeader === "1") { console.log("✅ Tool updated successfully!"); console.log("🔄 Reloading page to show changes..."); const currentUrl = window.location.href; const expositionId = currentUrl.match(/view\\/(\\d+)/)?.[1]; const weaveId = currentUrl.match(/view\\/\\d+\\/(\\d+)/)?.[1]; if (expositionId && weaveId) { const isInTextView = document.body.classList.contains("rc-text-only-mode"); if (isInTextView) { console.log("📝 Text view mode detected - preserving state for reload"); localStorage.setItem("rc_restore_text_view_" + expositionId + "_" + weaveId, "true"); } } setTimeout(() => window.location.reload(), 1000); return { success: true }; } else { throw new Error("Update validation failed"); } } catch (error) { console.error("❌ Error applying update:", error); return { success: false, error: error.message }; } }; console.log("🚀 testRCToolUpdate() and applyRCToolUpdate() functions are now available!"); console.log("🔧 Functions injected at:", new Date().toLocaleTimeString());';
+        script.textContent = `
+            window.testRCToolUpdate = async function(toolId, originalText, suggestionText) { 
+                const urlParams = new URLSearchParams(window.location.search); 
+                let researchId = urlParams.get("research"); 
+                if (!researchId) { 
+                    const pathMatch = window.location.pathname.match(/\\/editor\\/(\\d+)\\/(\\d+)/); 
+                    if (pathMatch) { researchId = pathMatch[1]; } 
+                } 
+                if (!researchId) { researchId = document.body.dataset.research; } 
+                const weaveId = document.body.dataset.weave || window.location.pathname.match(/\\/editor\\/(\\d+)\\/(\\d+)/)?.[2];
+                if (!researchId) { 
+                    console.error("❌ Could not find research ID. Current URL:", window.location.href); 
+                    console.log("💡 You might need to be on the editor page: /editor/researchId/weaveId"); 
+                    return false; 
+                } 
+                console.log("🧪 Testing RC tool update:", { toolId, originalText, suggestionText, researchId, weaveId }); 
+                console.log("📍 Current page:", window.location.href); 
+                console.log("🔍 Research ID extraction method:", researchId ? "success" : "failed"); 
+                try { 
+                    const editResponse = await fetch("/editor/" + researchId + "/" + weaveId + "/tools/" + toolId + "/edit", { 
+                        method: "GET", 
+                        headers: { "X-Requested-With": "XMLHttpRequest" } 
+                    }); 
+                    if (!editResponse.ok) { throw new Error("Failed to fetch tool data: " + editResponse.status); } 
+                    const editHtml = await editResponse.text(); 
+                    console.log("✓ Successfully fetched tool edit form"); 
+                    const parser = new DOMParser(); 
+                    const doc = parser.parseFromString(editHtml, "text/html"); 
+                    const contentTextarea = doc.querySelector('textarea[name="form[media][textContent]"]') || 
+                                          doc.querySelector('textarea[name="media[textcontent]"]');
+                    if (!contentTextarea) { throw new Error("Could not find content textarea"); } 
+                    const currentContent = contentTextarea.value; 
+                    if (!currentContent) { throw new Error("Content textarea found but is empty"); } 
+                    console.log("📝 Current content preview:", currentContent.substring(0, 200)); 
+                    const escapeHtml = (text) => { const div = document.createElement("div"); div.textContent = text; return div.innerHTML; }; 
+                    const suggestionSpan = '<span class="ai-suggestion" data-original="' + escapeHtml(originalText) + '" data-suggestion="' + escapeHtml(suggestionText) + '" title="AI Suggestion: ' + escapeHtml(suggestionText) + '">' + suggestionText + '</span>'; 
+                    const enhancedContent = currentContent.replace(originalText, suggestionSpan); 
+                    if (enhancedContent === currentContent) { console.warn("⚠ No text was replaced - original text not found"); return false; } 
+                    console.log("🔄 Enhanced content preview:", enhancedContent.substring(0, 200)); 
+                    console.log("✅ Test completed successfully! Ready to apply changes."); 
+                    return { success: true, originalContent: currentContent, enhancedContent: enhancedContent, toolId: toolId, researchId: researchId, weaveId: weaveId }; 
+                } catch (error) { 
+                    console.error("✗ Error in test:", error); 
+                    return { success: false, error: error.message }; 
+                } 
+            }; 
+            window.applyRCToolUpdate = async function(toolId, enhancedContent, researchId, weaveId) { 
+                console.log("🚀 Applying update to tool", toolId); 
+                try { 
+                    if (!weaveId) { weaveId = document.body.dataset.weave; }
+                    const editResponse = await fetch("/editor/" + researchId + "/" + weaveId + "/tools/" + toolId + "/edit", { 
+                        method: "GET", 
+                        headers: { "X-Requested-With": "XMLHttpRequest" } 
+                    }); 
+                    if (!editResponse.ok) { throw new Error("Failed to fetch tool data: " + editResponse.status); } 
+                    const editHtml = await editResponse.text(); 
+                    const parser = new DOMParser(); 
+                    const doc = parser.parseFromString(editHtml, "text/html"); 
+                    const contentTextarea = doc.querySelector('textarea[name="form[media][textContent]"]') || 
+                                          doc.querySelector('textarea[name="media[textcontent]"]');
+                    if (!contentTextarea) { throw new Error("Could not find content textarea"); } 
+                    const formattedContent = enhancedContent; 
+                    const formData = new FormData(); 
+                    console.log("🔍 Collecting all form fields..."); 
+                    const allInputs = doc.querySelectorAll("input, textarea, select"); 
+                    console.log("📋 Found", allInputs.length, "form fields"); 
+                    allInputs.forEach(input => { 
+                        const name = input.name; 
+                        const value = input.value || ""; 
+                        if (name && !name.startsWith("form[media]")) { 
+                            formData.append(name, value); 
+                        } 
+                    }); 
+                    formData.set("form[media][textContent]", formattedContent); 
+                    console.log("📤 Sending update request..."); 
+                    const updateResponse = await fetch("/editor/" + researchId + "/" + weaveId + "/tools/" + toolId + "/edit", { 
+                        method: "POST", 
+                        headers: { "X-Requested-With": "XMLHttpRequest" }, 
+                        body: formData 
+                    }); 
+                    if (!updateResponse.ok) { throw new Error("Failed to update tool: " + updateResponse.status); } 
+                    const rcFormStatus = updateResponse.headers.get("rc-form-status"); 
+                    if (rcFormStatus === "success") { 
+                        console.log("✅ Tool updated successfully!"); 
+                        console.log("🔄 Reloading page to show changes..."); 
+                        setTimeout(() => window.location.reload(), 1000); 
+                        return { success: true }; 
+                    } else { throw new Error("Update validation failed"); } 
+                } catch (error) { 
+                    console.error("❌ Error applying update:", error); 
+                    return { success: false, error: error.message }; 
+                } 
+            }; 
+            console.log("🚀 testRCToolUpdate() and applyRCToolUpdate() functions are now available!"); 
+            console.log("🔧 Functions injected at:", new Date().toLocaleTimeString());
+        `;
         document.head.appendChild(script);
         
         console.log('✅ RC Tool Commenter: Functions forcibly assigned to global scope');
